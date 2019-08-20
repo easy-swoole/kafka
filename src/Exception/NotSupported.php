@@ -1,7 +1,7 @@
 <?php
 
 
-namespace EasySwoole\Kafka\Exception;
+namespace EasySwoole\Kafka;
 
 
 class NotSupported extends Exception

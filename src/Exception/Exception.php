@@ -1,10 +1,10 @@
 <?php
 
 
-namespace EasySwoole\Kafka\Exception;
+namespace EasySwoole\Kafka;
 
 
-class Exception extends \Exception
+class Exception extends \Swoole\Exception
 {
 
 }
