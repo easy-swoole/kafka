@@ -7,12 +7,38 @@
  */
 namespace EasySwoole\Kafka\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 
-use EasySwoole\Component\Singleton;
-
-class Produce extends AbstractProtocol
+class Produce extends Protocol
 {
+    /**
+     * @param array $payloads
+     * @return string
+     * @throws ProtocolException
+     * @throws \EasySwoole\Kafka\Exception\NotSupported
+     */
+    public function encode(array $payloads = []): string
+    {
+        if (! isset($payloads['data'])) {
+            throw new ProtocolException("given produce data invalid, 'data' is undefined.");
+        }
 
-    use Singleton;
+        $header = $this->requestHeader('Easyswoole-kafka', 0, self::PRODUCE_REQUEST);
+        $data = self::pack(self::BIT_B16, (string) ($payloads['required_ack'] ?? 0));
+        $data .= self::pack(self::BIT_B32, (string) ($payloads['timout'] ?? 100));
+        $data .= self::encodeArray(
+            $payloads['data'],
+            [$this, 'encodeProduceTopic'],
+            $payloads['compression'] ?? self::COMPRESSION_NONE
+        );
+
+        return self::encodeString($header, $data, self::PACK_INT32);
+    }
+
+    public function decode(string $data): array
+    {
+        // TODO: Implement decode() method.
+    }
+
 
 }

@@ -8,7 +8,6 @@
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\Producer\Process;
-use EasySwoole\Kafka\Producer\SyncProcess;
 use EasySwoole\Log\Logger;
 
 class Producer
@@ -18,37 +17,43 @@ class Producer
 
     private $process;
 
+    /**
+     * Producer constructor.
+     * @param callable|null $producer
+     * @throws Exception\Exception
+     */
     public function __construct(?callable $producer = null)
     {
-        $this->process = $producer === null ? new SyncProcess() : new Process($producer);
+        $this->process = new Process();
         $this->logger = new Logger();
     }
 
     /**
-     * @param bool|array $data
+     * @param array $data
      * @return array|null
-     * @throws Exception
+     * @throws Exception\Exception
+     * @throws Exception\InvalidRecordInSet
      */
-    public function send($data = true): ?array
+    public function send(array $data): ?array
     {
         $this->logger->log('Start send producer data');
 
-        // $data 数组，走同步
-        if (is_array($data)) {
-            return $this->sendSynchronously($data);
-        }
+        return $this->process->send($data);
 
-        // $data 非数组，走异步
-        $this->sendAsynchronously($data);
-
-        return null;
+//        // 同步
+//        if (is_array($data)) {
+//            return $this->sendSynchronously($data);
+//        }
+//        // 异步
+//        $this->sendAsynchronously($data);
+//
+//        return null;
     }
 
     /**
-     * Send message synchronously
      * @param array $data
      * @return array
-     * @throws Exception
+     * @throws Exception\InvalidRecordInSet
      */
     public function sendSynchronously(array $data): array
     {

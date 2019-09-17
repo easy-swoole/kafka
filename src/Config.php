@@ -101,7 +101,7 @@ class Config extends SplBean
         // key
         $options = lcfirst(substr($name, 3));
 
-        if (! $isGetter) {
+        if ($isGetter) {
             if (isset(self::$options[$options])) {
                 return self::$options[$options];
             }
@@ -186,7 +186,6 @@ class Config extends SplBean
         if (empty($brokers)) {
             throw new Exception\Config("Broker list must be a comma-separated list of brokers (format: 'host:port'), with at least one broker.");
         }
-
         static::$options['metadataBrokerList'] = $brokerList;
     }
 

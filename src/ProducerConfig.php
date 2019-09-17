@@ -8,7 +8,7 @@
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Component\Singleton;
-use EasySwoole\Kafka\Protocol\AbstractProtocol;
+use EasySwoole\Kafka\Protocol\Protocol;
 use EasySwoole\Kafka\Protocol\Produce;
 use EasySwoole\Kafka\Exception;
 
@@ -39,7 +39,7 @@ class ProducerConfig extends Config
         'isAsyn'        => false,
         'requestTimeout'    => 6000,
         'produceInterval'   => 100,
-        'compression'       => AbstractProtocol::COMPRESSION_NONE,
+        'compression'       => Protocol::COMPRESSION_NONE,
     ];
 
     /**
@@ -109,7 +109,9 @@ class ProducerConfig extends Config
     public function setCompression(int $compression): void
     {
         if (! in_array($compression, self::COMPRESSION_OPTIONS, true)) {
-            throw new Exception\Config("Compression must be one the EasySwoole\Kafka\Protocol\Produce::COMPRESSION_OPTIONS_* constants.");
+            throw new Exception\Config(
+                "Compression must be one the EasySwoole\Kafka\Protocol\Produce::COMPRESSION_OPTIONS_* constants."
+            );
         }
 
         static::$options['compression'] = $compression;

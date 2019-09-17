@@ -2,6 +2,9 @@
 
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Exception\Exception;
+use EasySwoole\Kafka\Protocol\Produce;
+
 class Protocol
 {
     /**
@@ -221,7 +224,64 @@ class Protocol
         82 => 'The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id.',
     ];
 
+    /**
+     * @var Protocol\Protocol[]
+     */
+    protected static $objects = [];
 
+    public static function init(string $version): void
+    {
+        $class = [
+            Protocol\Protocol::PRODUCE_REQUEST  => Protocol\Produce::class,
+            Protocol\Protocol::METADATA_REQUEST => Protocol\Metadata::class,
+        ];
 
+        foreach ($class as $key => $className) {
+            self::$objects[$key] = new $className($version);
+        }
+    }
+
+    /**
+     * @param int   $key
+     * @param array $payloads
+     * @return string
+     * @throws Exception
+     */
+    public static function encode(int $key, array $payloads): string
+    {
+        if (! isset(self::$objects[$key])) {
+            throw new Exception("Not support api key, key:" . $key);
+        }
+
+        return self::$objects[$key]->encode($payloads);
+    }
+
+    /**
+     * @param int    $key
+     * @param string $data
+     * @return array
+     * @throws Exception
+     */
+    public static function decode(int $key, string $data): array
+    {
+        if (! isset(self::$objects[$key])) {
+            throw new Exception("Not support api key, key:" . $key);
+        }
+
+        return self::$objects[$key]->decode($data);
+    }
+
+    /**
+     * @param int $errCode
+     * @return string
+     */
+    public static function getError(int $errCode): string
+    {
+        if (! isset(self::PROTOCOL_ERROR_MAP[$errCode])) {
+            return "Unknow error ({$errCode})";
+        }
+
+        return self::PROTOCOL_ERROR_MAP[$errCode];
+    }
 
 }

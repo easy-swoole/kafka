@@ -21,15 +21,13 @@ class ProducerSyncTest extends TestCase
     {
         $config = ProducerConfig::getInstance();
         $config->setMetadataRefreshIntervalMs(10000);
-        $config->setMetadataBrokerList('127.0.0.01:9093');
+        $config->setMetadataBrokerList('127.0.0.1:9092');
         $config->setBrokerVersion('0.10.2.1');
         $config->setRequiredAck(1);
         $config->setIsAsyn(false);
         $config->setProduceInterval(500);
-
         $producer = new Producer();
-
-        for ($i = 0; $i < 100; $i++) {
+        for ($i = 0; $i < 1; $i++) {
             $result = $producer->send([
                 [
                     'topic' => 'test',
@@ -38,6 +36,5 @@ class ProducerSyncTest extends TestCase
                 ]
             ]);
         }
-        var_dump($result);
     }
 }

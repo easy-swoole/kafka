@@ -7,7 +7,6 @@
  */
 namespace EasySwoole\Kafka\Exception;
 
-use EasySwoole\Kafka\Exception;
 
 final class InvalidRecordInSet extends Exception
 {
