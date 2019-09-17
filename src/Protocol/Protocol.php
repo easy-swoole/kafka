@@ -331,7 +331,6 @@ abstract class Protocol
         $offset     = 0;
         $arrayCount = self::unpack(self::BIT_B32, substr($data, $offset, 4));
         $offset    += 4;
-
         $result = [];
 
         for ($i = 0; $i < $arrayCount; $i++) {

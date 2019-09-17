@@ -62,7 +62,7 @@ class Process
             return [];
         }
 
-        // 处理数据 todo：仔细研究
+        // 处理数据
         $sendData   = $this->convertRecordSet($recordSet);
         $result     = [];
         foreach ($sendData as $brokerId => $topicList) {
@@ -77,19 +77,16 @@ class Process
                 'data'         => $topicList,
                 'compression'  => $compression,
             ];
-
-            $this->logger->log('Send message start, params:' . json_encode($params), LOG_DEBUG);
+            $this->logger->log('Send message start, params:' . json_encode($params), 1);
             $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
-            $client->send($requestData);
-
+            $data = $client->send($requestData);
             if ($requiredAck !== 0) { // If it is 0 the server will not send any response
-                $recordSet     = $client->recv();
-                $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, $recordSet);
+                // todo 解包失败
+                $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 4));
 
                 $result[] = $ret;
             }
         }
-        var_dump($result);exit;
         return $result;
     }
 
@@ -161,11 +158,10 @@ class Process
             $this->recordValidator->validate($record, $topics);
 
             $topicMeta  = $topics[$record['topic']];
-            $partNums   = array_keys($topics);
+            $partNums   = array_keys($topicMeta);
             shuffle($partNums);
 
             $partId     = isset($record['partId'], $topicMeta[$record['partId']]) ? $record['partId'] : $partNums[0];
-var_dump($partId);
             $brokerId   = $topicMeta[$partId];
             $topicData  = [];
             if (isset($sendData[$brokerId][$record['topic']])) {
@@ -180,9 +176,9 @@ var_dump($partId);
             $partition['partition_id'] = $partId;
 
             if (trim($record['key'] ?? '') !== '') {
-                $partition['message'][] = ['value' => $record['value'], 'key' => $record['key']];
+                $partition['messages'][] = ['value' => $record['value'], 'key' => $record['key']];
             } else {
-                $partition['message'][] = $record['value'];
+                $partition['messages'][] = $record['value'];
             }
 
             $topicData['partitions'][$partId]       = $partition;
