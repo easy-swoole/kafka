@@ -8,14 +8,28 @@
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Component\Singleton;
+use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\Sasl\Plain;
 use EasySwoole\Log\Logger;
+use EasySwoole\Kafka\Exception;
 
 class Broker
 {
     use Singleton;
 
     /**
+     * @var int
+     */
+    private $groupBrokerId;
+
+    /**
+     * [
+     *   [
+     *     topicName:[
+     *       partitionId: leader
+     *     ]
+     *   ]
+     * ]
      * @var array
      */
     private $topics = [];
@@ -30,12 +44,16 @@ class Broker
      */
     private $config;
 
+    /**
+     * @var BaseProcess
+     */
     private $process;
 
     /**
      * @var Logger
      */
     private $logger;
+
     /**
      * @return mixed
      */
@@ -50,6 +68,22 @@ class Broker
     public function setProcess($process): void
     {
         $this->process = $process;
+    }
+
+    /**
+     * @return int
+     */
+    public function getGroupBrokerId(): int
+    {
+        return $this->groupBrokerId;
+    }
+
+    /**
+     * @param int $groupBrokerId
+     */
+    public function setGroupBrokerId(int $groupBrokerId): void
+    {
+        $this->groupBrokerId = $groupBrokerId;
     }
 
     /**
@@ -140,18 +174,18 @@ class Broker
 
             $changed = true;
         }
+        $this->logger->log(json_encode($newTopics));
         return $changed;
     }
 
     /**
-     * 获取meta链接
      * @param string $key
      * @param bool   $modeSync
      * @return Client|null
      */
     public function getMetaConnect(string $key, bool $modeSync = false): ?Client
     {
-        return $this->getConnect($key, 'metaClients', $modeSync);
+        return $this->getConnect($key, 'metaClients');
     }
 
     /**
@@ -162,16 +196,15 @@ class Broker
      */
     public function getDataConnect(string $key, bool $modeSync = false): ?Client
     {
-        return $this->getConnect($key, 'dataClients', $modeSync);
+        return $this->getConnect($key, 'dataClients');
     }
 
     /**
      * @param string $key
      * @param string $type
-     * @param bool   $modeSync
      * @return Client|null
      */
-    public function getConnect(string $key, string $type, bool $modeSync = false): ?Client
+    public function getConnect(string $key, string $type): ?Client
     {
         // 如果之前连接了，返回之前的连接
         if (isset($this->{$type}[$key])) {
@@ -198,18 +231,18 @@ class Broker
             [$host, $port] = explode(':', $key);
         }
 
-        if ($host === null || $port === null || (! $modeSync && $this->process === null)) {
+        if ($host === null || $port === null) {
             return null;
         }
-
+        $this->logger = new Logger();
         try {
-            $client = $this->getClient((string)$host, (int)$port, $modeSync);
+            $client = $this->getClient((string)$host, (int)$port);
             if ($client->connect()) {
                 $this->{$type}[$key] = $client;
                 return $client;
             }
         } catch (\Throwable $exception) {
-            $this->logger->log($exception->getMessage(), LOG_ERR);
+            $this->logger->log($exception->getMessage(), Logger::LOG_LEVEL_ERROR);
         }
         return null;
     }
@@ -217,12 +250,11 @@ class Broker
     /**
      * @param string $host
      * @param int    $port
-     * @param bool   $modeSync
      * @return null|\swoole_client
      * @throws Exception\Config
      * @throws Exception\Exception
      */
-    public function getClient(string $host, int $port, bool $modeSync): ?Client
+    public function getClient(string $host, int $port): ?Client
     {
         $saslProvider = $this->judgeConnectionConfig();
 
@@ -230,9 +262,25 @@ class Broker
     }
 
     /**
+     * @return Client|null
+     */
+    public function getRandConnect(): ?Client
+    {
+        var_dump($this->brokers);
+        $nodeIds = array_keys($this->brokers);
+        shuffle($nodeIds);
+        var_dump($nodeIds);
+        if (! isset($nodeIds[0])) {
+            return null;
+        }
+
+        return $this->getMetaConnect((string) $nodeIds[0]);
+    }
+
+    /**
      * @return SaslMechanism|null
-     * @throws Exception
      * @throws Exception\Config
+     * @throws Exception\Exception
      */
     private function judgeConnectionConfig(): ?SaslMechanism
     {
@@ -264,7 +312,7 @@ class Broker
     /**
      * @param Config $config
      * @return SaslMechanism
-     * @throws Exception
+     * @throws Exception\Exception
      */
     private function getSaslMechanismProvider(Config $config): SaslMechanism
     {
@@ -282,6 +330,6 @@ class Broker
                 break;
         }
 
-        throw new Exception(sprintf('"%s" is an invalid SASL mechnism', $mechanism));
+        throw new Exception\Exception(sprintf('"%s" is an invalid SASL mechnism', $mechanism));
     }
 }

@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Exception\Exception;
 use Swoole\Coroutine\Client as CoroutineClient;
@@ -124,6 +125,7 @@ class Client
 
     /**
      * @param null|string $data
+     * @return mixed
      * @throws ConnectionException
      * @throws Exception
      */
@@ -131,8 +133,6 @@ class Client
     {
         if ($this->connect()) {
             $this->client->send($data);
-//            return unpack('Cmagic/Copcode/nkeylength/Cextralength/Cdatatype/nstatus/Nbodylength/NOpaque/NCAS1/NCAS2',
-//                $this->client->recv());
             return $this->client->recv();
         }
         $connectStr = "tcp://{$this->host}:{$this->port}";

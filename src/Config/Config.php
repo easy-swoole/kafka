@@ -1,10 +1,9 @@
 <?php
 
-
-namespace EasySwoole\Kafka;
-
+namespace EasySwoole\Kafka\Config;
 
 use EasySwoole\Spl\SplBean;
+use EasySwoole\Kafka\Exception;
 
 /**
  * Class Config
@@ -156,7 +155,7 @@ class Config extends SplBean
      * @param string $version
      * @throws Exception\Config
      */
-    public function setBrokerVersion (string $version): void
+    public function setBrokerVersion(string $version): void
     {
         $version = trim($version);
 

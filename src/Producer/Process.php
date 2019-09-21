@@ -7,18 +7,14 @@
  */
 namespace EasySwoole\Kafka\Producer;
 
-use EasySwoole\Kafka\Broker;
-use EasySwoole\Kafka\Exception\ConnectionException;
+use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Exception\Exception;
-use EasySwoole\Kafka\ProducerConfig;
+use EasySwoole\Kafka\Config\ProducerConfig;
 use EasySwoole\Kafka\Protocol;
-use EasySwoole\Log\Logger;
 
-class Process
+class Process extends BaseProcess
 {
     private $recordValidator;
-
-    private $logger;
 
     /**
      * SyncProcess constructor.
@@ -28,18 +24,14 @@ class Process
      */
     public function __construct(?RecordValidator $recordValidator = null)
     {
+        parent::__construct();
+
         $this->recordValidator = $recordValidator ?? new RecordValidator();
 
-        $this->logger = new Logger();
+        $this->config = $this->getConfig();
+        $this->getBroker()->setConfig($this->config);
 
-        $config = $this->getConfig();
-        Protocol::init($config->getBrokerVersion());
-
-        $broker = $this->getBroker();
-        $broker->setConfig($config);
-        $broker->setLogger($this->logger);
-
-        $this->getMeta();
+        $this->syncMeta();
     }
 
     /**
@@ -72,75 +64,23 @@ class Process
             }
 
             $params = [
+                'transactional_id' => null,
                 'required_ack' => $requiredAck,
                 'timeout'      => $timeout,
                 'data'         => $topicList,
                 'compression'  => $compression,
             ];
-            $this->logger->log('Send message start, params:' . json_encode($params), 1);
+            $this->logger->log('Send producer message start, params:' . json_encode($params), 1);
             $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
             $data = $client->send($requestData);
             if ($requiredAck !== 0) { // If it is 0 the server will not send any response
                 // todo 解包失败
-                $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 4));
-
+                $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
+                $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 8));
                 $result[] = $ret;
             }
         }
         return $result;
-    }
-
-    /**
-     * 元数据meta
-     * 获取topics和brokers信息
-     * @throws ConnectionException
-     * @throws Exception
-     */
-    public function getMeta(): void
-    {
-        $this->logger->log('Start sync metadata request', 1);
-
-        $brokerList = ProducerConfig::getInstance()->getMetadataBrokerList();
-        $brokerHost = [];
-        foreach (explode(',', $brokerList) as $key => $val) {
-            if (trim($val)) {
-                $brokerHost[] = $val;
-            }
-        }
-        if (count($brokerHost) === 0) {
-            throw new Exception('No valid broker configured');
-        }
-
-        shuffle($brokerHost);
-        $broker = $this->getBroker();
-
-        foreach ($brokerHost as $host) {
-            $client = $broker->getMetaConnect($host, true);
-            if (! $client->isConnected()) {
-                continue;
-            }
-
-            $params = [];
-            $this->logger->log('Start sync metadata request params:' . json_encode($params));
-
-            $requestData = Protocol::encode(Protocol::METADATA_REQUEST, $params);
-            $data = $client->send($requestData);
-            $dataLen = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
-            $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 4, 4));
-            // 0-4字节是包头长度
-            // 4-8字节是数组元素个数
-            // 从第9个字节开始才是数据正文
-            $result = Protocol::decode(Protocol::METADATA_REQUEST, substr($data, 8));
-            if (! isset($result['brokers'], $result['topics'])) {
-                throw new Exception("Get metadata is fail, brokers or topics is null.");
-            }
-            // 更新 topics和brokers
-            $broker->setData($result['topics'], $result['brokers']);
-
-            return;
-        }
-
-        throw new ConnectionException($brokerList);
     }
 
     /**
@@ -150,25 +90,26 @@ class Process
      */
     protected function convertRecordSet(array $recordSet): array
     {
-        $sendData   = [];
-        $broker     = $this->getBroker();
-        $topics     = $broker->getTopics();// syncMeta获取 broker和topics数据
+        $sendData = [];
+        $broker   = $this->getBroker();
+        $topics   = $broker->getTopics(); // syncMeta获取 broker和topics数据
 
         foreach ($recordSet as $record) {
             $this->recordValidator->validate($record, $topics);
 
-            $topicMeta  = $topics[$record['topic']];
-            $partNums   = array_keys($topicMeta);
+            $topicMeta = $topics[$record['topic']];
+            $partNums  = array_keys($topicMeta);
             shuffle($partNums);
 
-            $partId     = isset($record['partId'], $topicMeta[$record['partId']]) ? $record['partId'] : $partNums[0];
-            $brokerId   = $topicMeta[$partId];
-            $topicData  = [];
+            $partId = isset($record['partId'], $topicMeta[$record['partId']]) ? $record['partId'] : $partNums[0];
+
+            $brokerId  = $topicMeta[$partId];
+            $topicData = [];
             if (isset($sendData[$brokerId][$record['topic']])) {
-                $topicData = $sendData[$brokerId][$record]['topic'];
+                $topicData = $sendData[$brokerId][$record['topic']];
             }
 
-            $partition  = [];
+            $partition = [];
             if (isset($topicData['partitions'][$partId])) {
                 $partition = $topicData['partitions'][$partId];
             }
@@ -181,20 +122,18 @@ class Process
                 $partition['messages'][] = $record['value'];
             }
 
-            $topicData['partitions'][$partId]       = $partition;
-            $topicData['topic_name']                = $record['topic'];
-            $sendData[$brokerId][$record['topic']]  = $topicData;
+            $topicData['partitions'][$partId]      = $partition;
+            $topicData['topic_name']               = $record['topic'];
+            $sendData[$brokerId][$record['topic']] = $topicData;
         }
 
         return $sendData;
     }
 
-    private function getBroker(): Broker
-    {
-        return Broker::getInstance();
-    }
-
-    private function getConfig(): ProducerConfig
+    /**
+     * @return ProducerConfig
+     */
+    protected function getConfig(): ProducerConfig
     {
         return ProducerConfig::getInstance();
     }

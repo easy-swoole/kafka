@@ -232,8 +232,21 @@ class Protocol
     public static function init(string $version): void
     {
         $class = [
-            Protocol\Protocol::PRODUCE_REQUEST  => Protocol\Produce::class,
-            Protocol\Protocol::METADATA_REQUEST => Protocol\Metadata::class,
+            Protocol\Protocol::PRODUCE_REQUEST           => Protocol\Produce::class,
+            Protocol\Protocol::METADATA_REQUEST          => Protocol\Metadata::class,
+            Protocol\Protocol::FETCH_REQUEST             => Protocol\Fetch::class,
+            Protocol\Protocol::OFFSET_REQUEST            => Protocol\Offset::class,
+            Protocol\Protocol::OFFSET_COMMIT_REQUEST     => Protocol\CommitOffset::class,
+            Protocol\Protocol::OFFSET_FETCH_REQUEST      => Protocol\FetchOffset::class,
+            Protocol\Protocol::GROUP_COORDINATOR_REQUEST => Protocol\GroupCoordinator::class,
+            Protocol\Protocol::JOIN_GROUP_REQUEST        => Protocol\JoinGroup::class,
+            Protocol\Protocol::HEART_BEAT_REQUEST        => Protocol\Heartbeat::class,
+            Protocol\Protocol::LEAVE_GROUP_REQUEST       => Protocol\LeaveGroup::class,
+            Protocol\Protocol::SYNC_GROUP_REQUEST        => Protocol\SyncGroup::class,
+            Protocol\Protocol::DESCRIBE_GROUPS_REQUEST   => Protocol\DescribeGroups::class,
+            Protocol\Protocol::LIST_GROUPS_REQUEST       => Protocol\ListGroup::class,
+            //Protocol\Protocol::SASL_HAND_SHAKE_REQUEST   => Protocol\SaslHandShake::class,
+            Protocol\Protocol::API_VERSIONS_REQUEST      => Protocol\ApiVersions::class,
         ];
 
         foreach ($class as $key => $className) {
