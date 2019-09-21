@@ -5,7 +5,7 @@
  * Date: 2019/8/17
  * Time: 下午11:06
  */
-namespace EasySwoole\Kafka;
+namespace EasySwoole\Kafka\Config;
 
 use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Protocol\Protocol;

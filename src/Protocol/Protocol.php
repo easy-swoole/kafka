@@ -122,6 +122,15 @@ abstract class Protocol
     private static $isLittleEndianSystem;
 
     /**
+     * Protocol constructor.
+     * @param string $version
+     */
+    public function __construct(string $version = self::DEFAULT_BROKER_VERION)
+    {
+        $this->version = $version;
+    }
+
+    /**
      * Converts a signed short (16 bits) from little endian to big endian.
      *
      * @param int[] $bits
@@ -145,14 +154,23 @@ abstract class Protocol
         return array_map($convert, $bits);
     }
 
+    /**
+     * @param string $clientId
+     * @param int    $correlationId
+     * @param int    $apiKey
+     * @return string
+     * @throws NotSupported
+     */
     public function requestHeader(string $clientId, int $correlationId, int $apiKey): string
     {
-        // int16 -- apiKey int16 -- apiVersion int32 correlationId
-        $binData = self::pack(self::BIT_B16, (string)$apiKey);
-        $binData .= self::pack(self::BIT_B16, (string)$this->getApiVersion($apiKey));
-        $binData .= self::pack(self::BIT_B32, (string)$correlationId);
-        // concat client id
-        $binData .= self::encodeString($clientId, self::PACK_INT16);
+        // int16 -- apiKey, int16 -- apiVersion, int32 correlationId, string clientId
+        $version        = (string)$this->getApiVersion($apiKey);
+        $apiKey         = self::pack(self::BIT_B16, (string)$apiKey);
+        $apiVersion     = self::pack(self::BIT_B16, $version);
+        $correlationId  = self::pack(self::BIT_B32, (string)$correlationId);
+        $clientId       = self::encodeString($clientId, self::PACK_INT16);
+
+        $binData = $apiKey . $apiVersion . $correlationId . $clientId;
         return $binData;
     }
 
@@ -250,7 +268,7 @@ abstract class Protocol
     {
         switch ($apiKey) {
             case self::FETCH_REQUEST:
-            case self::PRODUCE_REQUEST:{
+            case self::PRODUCE_REQUEST:
                 if (version_compare($this->version, '0.10.0') >= 0) {
                     return self::API_VERSION2;
                 }
@@ -258,8 +276,8 @@ abstract class Protocol
                     return self::API_VERSION1;
                 }
                 return self::API_VERSION0;
-            }
-            case self::OFFSET_COMMIT_REQUEST:{
+
+            case self::OFFSET_COMMIT_REQUEST:
                 if (version_compare($this->version, '0.9.0') >= 0) {
                     return self::API_VERSION2;
                 }
@@ -267,22 +285,21 @@ abstract class Protocol
                     return self::API_VERSION1;
                 }
                 return self::API_VERSION0;
-            }
-            case self::OFFSET_FETCH_REQUEST:{
+
+            case self::OFFSET_FETCH_REQUEST:
                 if (version_compare($this->version, '0.8.2') >= 0) {
                     return self::API_VERSION1; // Offset Fetch Request v1 will fetch offset from Kafka
                 }
                 return self::API_VERSION0;
-            }
-            case self::JOIN_GROUP_REQUEST:{
+
+            case self::JOIN_GROUP_REQUEST:
                 if (version_compare($this->version, '0.10.1.0') >= 0) {
                     return self::API_VERSION1;
                 }
                 return self::API_VERSION0;
-            }
-            default:{
+
+            default:
                 return self::API_VERSION0;
-            }
         }
     }
 

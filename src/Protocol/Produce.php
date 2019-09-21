@@ -44,8 +44,14 @@ class Produce extends Protocol
         }
 
         $header = $this->requestHeader('Easyswoole-kafka', 0, self::PRODUCE_REQUEST);
-        $data = self::pack(self::BIT_B16, (string) ($payloads['required_ack'] ?? 0));
-        $data .= self::pack(self::BIT_B32, (string) ($payloads['timout'] ?? 100));
+        $data = '';
+        $version = $this->getApiVersion(self::PRODUCE_REQUEST);
+        if ($version === self::API_VERSION2) {
+            // transactional_id NULLABLE_STRING
+            $data .= self::pack(self::BIT_B32, ($payloads['transactional_id'] ?? null));
+        }
+        $data .= self::pack(self::BIT_B16, (string) ($payloads['required_ack'] ?? 0));// acks int16
+        $data .= self::pack(self::BIT_B32, (string) ($payloads['timeout'] ?? 100));// timeout int32
         $data .= self::encodeArray(
             $payloads['data'],
             [$this, 'encodeProduceTopic'],
@@ -92,7 +98,7 @@ class Produce extends Protocol
             throw new ProtocolException('given produce data invalid. `partitions` is undefined.');
         }
 
-        $topic      = self::encodeString($values['topic_name'], self::PACK_INT16);
+        $topic      = self::encodeString($values['topic_name'], self::PACK_INT16); // topic STRING
         $partitions = self::encodeArray($values['partitions'], [$this, 'encodeProducePartition'], $compression);
 
         return $topic . $partitions;
@@ -115,7 +121,7 @@ class Produce extends Protocol
             throw new ProtocolException('given produce data invalid. `messages` is undefined.');
         }
 
-        $data  = self::pack(self::BIT_B32, (string) $values['partition_id']);
+        $data  = self::pack(self::BIT_B32, (string) $values['partition_id']); // partition int32
         $data .= self::encodeString(
             $this->encodeMessageSet((array) $values['messages'], $compression),
             self::PACK_INT32
@@ -167,7 +173,7 @@ class Produce extends Protocol
         $data .= self::pack(self::BIT_B8, (string) $attributes);
 
         if ($magic >= self::MESSAGE_MAGIC_VERSION1) {
-            $data .= self::pack(self::BIT_B64, $this->clock->now()->format('Uv'));
+            $data .= self::pack(self::BIT_B64, time());
         }
 
         $key = '';
