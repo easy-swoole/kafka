@@ -10,6 +10,12 @@ namespace EasySwoole\Kafka\Config;
 use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Exception;
 
+/**
+ * Class OffsetConfig
+ * @method string getGroupId
+ * @method array getTopics
+ * @package EasySwoole\Kafka\Config
+ */
 class OffsetConfig extends Config
 {
     use Singleton;
@@ -25,21 +31,6 @@ class OffsetConfig extends Config
     ];
 
     /**
-     * @return string
-     * @throws Exception\Config
-     */
-    public function getGroupId(): string
-    {
-        $groupId = trim($this->ietGroupId());
-
-        if ($groupId === false || $groupId === '') {
-            throw new Exception\Config('Get group id value is invalid, must set it not empty string');
-        }
-
-        return $groupId;
-    }
-
-    /**
      * @param string $groupId
      * @throws Exception\Config
      */
@@ -52,5 +43,18 @@ class OffsetConfig extends Config
         }
 
         static::$options['groupId'] = $groupId;
+    }
+
+    /**
+     * @param array $topics
+     * @throws Exception\Config
+     */
+    public function setTopics(array $topics): void
+    {
+        if (empty($topics)) {
+            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
+        }
+
+        static::$options['topics'] = $topics;
     }
 }

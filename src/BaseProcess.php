@@ -71,8 +71,6 @@ class BaseProcess
      */
     protected function syncMeta(): void
     {
-        $this->logger->log('Start sync metadata request', Logger::LOG_LEVEL_INFO);
-
         $brokerList = $this->config->getMetadataBrokerList();
         $brokerHost = [];
         foreach (explode(',', $brokerList) as $key => $val) {
@@ -107,7 +105,6 @@ class BaseProcess
                 throw new Exception("Get metadata is fail, brokers or topics is null.");
             }
             // 更新 topics和brokers
-            $this->logger->log(json_encode($result['brokers']));
             $broker->setData($result['topics'], $result['brokers']);
 
             return;

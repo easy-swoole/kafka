@@ -8,7 +8,6 @@
 namespace EasySwoole\Kafka\Offset;
 
 use EasySwoole\Kafka\BaseProcess;
-use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\OffsetConfig;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Log\Logger;
@@ -17,16 +16,15 @@ class Process extends BaseProcess
 {
     /**
      * Process constructor.
+     * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function __construct()
     {
         parent::__construct();
 
-        $config = $this->getConfig();
-        Protocol::init($config->getBrokerVersion());
-
-        $broker = $this->getBroker();
-        $broker->setConfig($config);
+        $this->config = $this->getConfig();
+        Protocol::init($this->config->getBrokerVersion());
+        $this->getBroker()->setConfig($this->config);
 
         $this->syncMeta();
     }
@@ -36,33 +34,40 @@ class Process extends BaseProcess
      * @throws \EasySwoole\Kafka\Exception\ConnectionException
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function offset(): array
+    public function listOffset(): array
     {
-        $context = [];
-        $broker  = $this->getBroker();
-        $topics  = $this->getAssignment()->getTopics();
+        $broker     = $this->getBroker();
+        $topics     = $broker->getTopics();
+        $topicList  = $this->config->getTopics();
 
-        foreach ($topics as $brokerId => $topicList) {
-            $connect = $broker->getMetaConnect((string) $brokerId);
+        $result     = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $broker->getMetaConnect($host);
 
             if ($connect === null) {
-                return [];
+                continue;
             }
 
             $data = [];
-            foreach ($topicList as $topic) {
-                $item = [
-                    'topic' => $topic['topic_name'],
-                    'partitions' => [],
-                ];
+            foreach ($topics as $topic => $partitions) {
+                foreach ($topicList as $topicName) {
+                    if ($topic !== $topicName) {
+                        continue;
+                    }
 
-                foreach ($topic['partitions'] as $partId) {
-                    $item['partitions'][] = [
-                        'partition_id' => $partId,
-                        'offset' => 1,
-                        'time' =>  -1,
+                    $item = [
+                        'topic_name' => $topic,
+                        'partitions' => [],
                     ];
-                    $data[]               = $item;
+
+                    foreach ($partitions as $partId => $leader) {
+                        $item['partitions'][] = [
+                            'partition_id' => $partId,
+                            'offset' => 100,
+                            'time' =>  -1,
+                        ];
+                    }
+                    $data[] = $item;
                 }
             }
 
@@ -71,61 +76,71 @@ class Process extends BaseProcess
                 'data'       => $data,
             ];
 
+            $this->logger->log('listOffset start, params:' . json_encode($params));
             $requestData = Protocol::encode(Protocol::OFFSET_REQUEST, $params);
-
             $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 4));
-            $context[] = $ret;
+            $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
+
+            $result[] = $ret;
         }
 
-        return $context;
+        return $result;
     }
 
     /**
-     * @throws \EasySwoole\Kafka\Exception\Config
+     * @return array
      * @throws \EasySwoole\Kafka\Exception\ConnectionException
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function fetchOffset(): array
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
+        $broker     = $this->getBroker();
+        $topics     = $broker->getTopics();
+        $topicList  = $this->config->getTopics();
 
-        if ($connect === null) {
-            return [];
-        }
+        $result     = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $broker->getMetaConnect($host);
 
-        $topics = $this->getAssignment()->getTopics();
-        $data   = [];
-
-        foreach ($topics as $brokerId => $topicList) {
-            foreach ($topicList as $topic) {
-                $partitions = [];
-
-                if (isset($data[$topic['topic_name']]['partitions'])) {
-                    $partitions = $data[$topic['topic_name']]['partitions'];
-                }
-
-                foreach ($topic['partitions'] as $partId) {
-                    $partitions[] = $partId;
-                }
-
-                $data[$topic['topic_name']]['partitions'] = $partitions;
-                $data[$topic['topic_name']]['topic_name'] = $topic['topic_name'];
+            if ($connect === null) {
+                continue;
             }
+
+            $data   = [];
+
+            foreach ($topics as $topic => $partitions) {
+                foreach ($topicList as $topicName) {
+                    if ($topic !== $topicName) {
+                        continue;
+                    }
+                    $partition          = [];
+
+                    if (isset($data[$topic]['partitions'])) {
+                        $partition      = $data[$topic]['partitions'];
+                    }
+
+                    foreach ($partitions as $partId => $leader) {
+                        $partition[]    = $partId;
+                    }
+                    $data[$topic]['partitions'] = $partition;
+                    $data[$topic]['topic_name'] = $topicName;
+                }
+            }
+
+            $params = [
+                'group_id' => $this->config->getGroupId(),
+                'data'     => $data,
+            ];
+
+            $this->logger->log('Fetch Offset start, params:' . json_encode($params));
+            $requestData    = Protocol::encode(Protocol::OFFSET_FETCH_REQUEST, $params);
+            $data           = $connect->send($requestData);
+            $ret            = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 8));
+
+            $result[]       = $ret;
         }
 
-        $params = [
-            'group_id' => $this->getConfig()->getGroupId(),
-            'data'     => $data,
-        ];
-
-        $requestData = Protocol::encode(Protocol::OFFSET_FETCH_REQUEST, $params);
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 4));
-
-        return $ret;
+        return $result;
     }
 
     /**
@@ -190,12 +205,7 @@ class Process extends BaseProcess
         return $ret;
     }
 
-    private function getBroker(): Broker
-    {
-        return Broker::getInstance();
-    }
-
-    private function getConfig(): OffsetConfig
+    protected function getConfig(): OffsetConfig
     {
         return OffsetConfig::getInstance();
     }

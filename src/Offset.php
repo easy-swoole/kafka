@@ -13,33 +13,37 @@ class Offset
 {
     private $process;
 
+    /**
+     * Offset constructor.
+     * @throws Exception\Exception
+     */
     public function __construct()
     {
         $this->process = new Process();
     }
 
     /**
-     * @return array|null
+     * @return array
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function listOffset(): ?array
+    public function listOffset(): array
     {
-        return $this->process->offset();
+        return $this->process->listOffset();
     }
 
     /**
-     * @return array|null
-     * @throws Exception\Config
+     * @return array
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function fetchOffset(): ?array
+    public function fetchOffset(): array
     {
         return $this->process->fetchOffset();
     }
 
     /**
+     * todo
      * @return array|null
      * @throws Exception\Config
      * @throws Exception\Exception

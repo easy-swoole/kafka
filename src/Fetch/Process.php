@@ -32,39 +32,44 @@ class Process extends BaseProcess
     }
 
     /**
-     * @param $topicName
      * @return array
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function fetch($topicName): array
+    public function fetch(): array
     {
-        $context         = [];
         $broker          = $this->getBroker();
         $topics          = $broker->getTopics();
 
-        foreach ($topics as $topic => $partitions) {
-            if ($topic !== $topicName) {
+        $result = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $broker->getMetaConnect($host);
+
+            if ($connect === null) {
                 continue;
             }
-            $connect = $broker->getDataConnect(0);// todo key
-            if ($connect === null) {
-                return [];
+
+            $data = [];
+            foreach ($topics as $topic => $partitions) {
+                foreach ($this->config->getTopics() as $topicName) {
+                    if ($topic !== $topicName) {
+                        continue;
+                    }
+                    $item = [
+                        'topic_name' => $topic,
+                        'partitions' => [],
+                    ];
+                    foreach ($partitions as $partId => $leader) {
+                        $item['partitions'][] = [
+                            'partition_id' => $partId,
+                            'offset' => 1,// todo 偏移量获取方式
+                            'max_bytes' => $this->getConfig()->getMaxBytes(),
+                        ];
+                    }
+                    $data[] = $item;
+                }
             }
 
-            $item = [
-                'topic_name' => $topic,
-                'partitions' => [],
-            ];
-
-            foreach ($partitions as $partId => $leader) {
-                $item['partitions'][] = [
-                    'partition_id' => $partId,
-                    'offset' => 5,// todo 偏移量获取方式
-                    'max_bytes' => $this->getConfig()->getMaxBytes(),
-                ];
-            }
-            $data[] = $item;
             $params = [
                 'max_wait_time'     => $this->getConfig()->getMaxWaitTime(),
                 'min_bytes'         => $this->getConfig()->getMinBytes(),
@@ -76,10 +81,10 @@ class Process extends BaseProcess
             $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
             $data = $connect->send($requestData);
             $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
-            $context[] = $ret;
+            $result[] = $ret;
         }
 
-        return $context;
+        return $result;
     }
 
     protected function getConfig(): FetchConfig
