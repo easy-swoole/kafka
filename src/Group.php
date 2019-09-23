@@ -61,4 +61,10 @@ class Group
     {
         return $this->process->listGroup();
     }
+
+
+    public function syncGroup()
+    {
+        return $this->process->syncGroup();
+    }
 }

@@ -65,8 +65,6 @@ class Process extends BaseProcess
      */
     public function joinGroup(): array
     {
-//        $this->syncMeta();
-
         $broker = $this->getBroker();
 //        $topics = $broker->getTopics();
 
@@ -89,7 +87,7 @@ class Process extends BaseProcess
                     [
                         'protocol_name' => 'range',
                         'version'       => 0,
-                        'subscription'  => ['test'],
+                        'subscription'  => ['test'],// todo
                         'user_data'     => '',
                     ],
                 ],
@@ -115,27 +113,28 @@ class Process extends BaseProcess
     {
         $broker = $this->getBroker();
 
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
+        $result = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $broker->getMetaConnect($host);
+            if ($connect === null) {
+                continue;
+            }
 
-        if ($connect === null) {
-            return [];
+            $memberId = '';
+
+            $params = [
+                'group_id'          => $this->getConfig()->getGroupId(),
+                'member_id'         => $memberId ?? '',// todo memberID
+            ];
+
+            $requestData = Protocol::encode(Protocol::LEAVE_GROUP_REQUEST, $params);
+            $this->logger->log('Leave group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
+            $data = $connect->send($requestData);
+            $ret = Protocol::decode(Protocol::LEAVE_GROUP_REQUEST, substr($data, 8));
+
+            $result[] = $ret;
         }
-
-        $assign   = $this->getAssignment();
-        $memberId = $assign->getMemberId();
-
-        $params = [
-            'group_id'          => $this->getConfig()->getGroupId(),
-            'member_id'         => $memberId ?? '',
-        ];
-
-        $requestData = Protocol::encode(Protocol::LEAVE_GROUP_REQUEST, $params);
-        $this->logger->log('Leave group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::LEAVE_GROUP_REQUEST, substr($data, 4));
-
-        return $ret;
+        return $result;
     }
 
     /**

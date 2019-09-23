@@ -174,7 +174,6 @@ class Broker
 
             $changed = true;
         }
-        $this->logger->log(json_encode($newTopics));
         return $changed;
     }
 
@@ -266,10 +265,8 @@ class Broker
      */
     public function getRandConnect(): ?Client
     {
-        var_dump($this->brokers);
         $nodeIds = array_keys($this->brokers);
         shuffle($nodeIds);
-        var_dump($nodeIds);
         if (! isset($nodeIds[0])) {
             return null;
         }

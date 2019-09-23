@@ -24,13 +24,12 @@ class Fetch
     }
 
     /**
-     * @param $topicName
      * @return array|null
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function fetch($topicName): ?array
+    public function fetch(): ?array
     {
-        return $this->process->fetch($topicName);
+        return $this->process->fetch();
     }
 }

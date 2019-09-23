@@ -18,7 +18,9 @@ go(function () {
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0');
 
+    $config->setTopics(['test']);
+
     $fetch = new Fetch();
-    $result = $fetch->fetch('test');
+    $result = $fetch->fetch();
     var_dump($result);
 });
