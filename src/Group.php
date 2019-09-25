@@ -57,14 +57,28 @@ class Group
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function listGroup()
-    {
-        return $this->process->listGroup();
-    }
-
-
     public function syncGroup()
     {
         return $this->process->syncGroup();
+    }
+
+    /**
+     * @return array
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function describeGroups()
+    {
+        return $this->process->describeGroups();
+    }
+
+    /**
+     * @return array
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function listGroup()
+    {
+        return $this->process->listGroup();
     }
 }

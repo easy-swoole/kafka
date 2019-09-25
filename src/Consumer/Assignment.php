@@ -94,6 +94,14 @@ class Assignment
     }
 
     /**
+     * @param array $assignments
+     */
+    public function setAssignments(array $assignments): void
+    {
+        $this->assignments = $assignments;
+    }
+
+    /**
      * @param string[] $result
      */
     public function assign(array $result): void

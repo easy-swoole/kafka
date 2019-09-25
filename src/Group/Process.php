@@ -9,6 +9,7 @@ namespace EasySwoole\Kafka\Group;
 
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\GroupConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Log\Logger;
 
@@ -65,12 +66,9 @@ class Process extends BaseProcess
      */
     public function joinGroup(): array
     {
-        $broker = $this->getBroker();
-//        $topics = $broker->getTopics();
-
         $result = [];
         foreach ($this->brokerHost as $host) {
-            $connect       = $broker->getMetaConnect((string) $host);
+            $connect       = $this->getBroker()->getMetaConnect((string) $host);
 
             if ($connect === null) {
                 continue;
@@ -82,10 +80,10 @@ class Process extends BaseProcess
                 'group_id'          => $this->getConfig()->getGroupId(),
                 'session_timeout'   => $this->getConfig()->getSessionTimeout(),
                 'rebalance_timeout' => $this->getConfig()->getRebalanceTimeout(),
-                'member_id'         => $memberId ?? '',// todo memberID
+                'member_id'         => $memberId ?? '',// todo joinGroup接口返回的member_id
                 'data'              => [
                     [
-                        'protocol_name' => 'range',
+                        'protocol_name' => 'group',
                         'version'       => 0,
                         'subscription'  => ['test'],// todo
                         'user_data'     => '',
@@ -120,11 +118,11 @@ class Process extends BaseProcess
                 continue;
             }
 
-            $memberId = '';
+            $memberId = $this->getAssignment()->getMemberId();
 
             $params = [
                 'group_id'          => $this->getConfig()->getGroupId(),
-                'member_id'         => $memberId ?? '',// todo memberID
+                'member_id'         => $memberId ?? '',// todo joinGroup接口返回的member_id
             ];
 
             $requestData = Protocol::encode(Protocol::LEAVE_GROUP_REQUEST, $params);
@@ -134,6 +132,7 @@ class Process extends BaseProcess
 
             $result[] = $ret;
         }
+
         return $result;
     }
 
@@ -144,32 +143,46 @@ class Process extends BaseProcess
      */
     public function syncGroup(): array
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
+        $result     = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $this->getBroker()->getMetaConnect($host);
 
-        if ($connect === null) {
-            return [];
+            if ($connect === null) {
+                continue;
+            }
+
+            $assign       = $this->getAssignment();
+            $memberId     = $assign->getMemberId(); // //todo joinGroup接口返回的member_id
+            $generationId = $assign->getGenerationId(); //todo joinGroup接口返回的generation_id
+
+            $assign->setAssignments([[
+                'version' => 0,
+                'member_id' => 'Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107',
+                'assignments' => [[
+                    'topic_name' => 'test',
+                    'partitions' => [
+                        0
+                    ],
+                ]],
+            ]]);
+
+            $params = [
+                'group_id'      => $this->getConfig()->getGroupId(),
+                'generation_id' => $generationId ?? null,
+                'member_id'     => $memberId,
+                'data'          => $assign->getAssignments(),
+            ];
+
+            $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
+            $this->logger->log('Sync group start, params:' . json_encode($params));
+
+            $data = $connect->send($requestData);
+            $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
+
+            $result[] = $ret;
         }
 
-        $assign       = $this->getAssignment();
-        $memberId     = $assign->getMemberId();
-        $generationId = $assign->getGenerationId();
-
-        $params = [
-            'group_id'      => $this->getConfig()->getGroupId(),
-            'generation_id' => $generationId ?? null,
-            'member_id'     => $memberId,
-            'data'          => $assign->getAssignments(),
-        ];
-
-        $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
-        $this->logger->log('Sync group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 4));
-
-        return $ret;
+        return $result;
     }
 
     /**
@@ -179,29 +192,28 @@ class Process extends BaseProcess
      */
     public function describeGroups(): array
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
+        $result     = [];
+        foreach ($this->brokerHost as $host) {
+            $connect = $this->getBroker()->getMetaConnect($host);
 
-        if ($connect === null) {
-            return [];
+            if ($connect === null) {
+                continue;
+            }
+
+            $params = [
+                'groups' => $this->config->getGroupId(),
+            ];
+
+            $requestData = Protocol::encode(Protocol::DESCRIBE_GROUPS_REQUEST, $params);
+            $this->logger->log('Describe group start, params:' . json_encode($params));
+
+            $data = $connect->send($requestData);
+            $ret = Protocol::decode(Protocol::DESCRIBE_GROUPS_REQUEST, substr($data, 8));
+
+            $result[] = $ret;
         }
 
-        $assign       = $this->getAssignment();
-        $memberId     = $assign->getMemberId();
-        $generationId = $assign->getGenerationId();
-
-        $params = [
-            'groups' => '',
-        ];
-
-        $requestData = Protocol::encode(Protocol::DESCRIBE_GROUPS_REQUEST, $params);
-        $this->logger->log('Describe group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::DESCRIBE_GROUPS_REQUEST, substr($data, 4));
-
-        return $ret;
+        return $result;
     }
 
     /**
@@ -241,5 +253,13 @@ class Process extends BaseProcess
     protected function getConfig(): GroupConfig
     {
         return GroupConfig::getInstance();
+    }
+
+    /**
+     * @return Assignment
+     */
+    protected function getAssignment(): Assignment
+    {
+        return Assignment::getInstance();
     }
 }

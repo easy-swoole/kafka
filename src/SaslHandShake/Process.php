@@ -2,19 +2,16 @@
 /**
  * Created by PhpStorm.
  * User: Manlin
- * Date: 2019/9/19
- * Time: 下午1:49
+ * Date: 2019/9/24
+ * Time: 下午5:47
  */
-namespace EasySwoole\Kafka\Heartbeat;
+namespace EasySwoole\Kafka\SaslHandShake;
 
 use EasySwoole\Kafka\BaseProcess;
-use EasySwoole\Kafka\Config\HeartBeatConfig;
-use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
 {
-
     /**
      * Process constructor.
      * @throws \EasySwoole\Kafka\Exception\Exception
@@ -33,7 +30,7 @@ class Process extends BaseProcess
      * @throws \EasySwoole\Kafka\Exception\ConnectionException
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function heartbeat(): array
+    public function handShake()
     {
         $result     = [];
         foreach ($this->brokerHost as $host) {
@@ -44,17 +41,16 @@ class Process extends BaseProcess
             }
 
             $params = [
-                'group_id'      => HeartBeatConfig::getInstance()->getGroupId(),
-                'generation_id' => Assignment::getInstance()->getGenerationId(),
-                'member_id'     => Assignment::getInstance()->getMemberId(),
+                $this->config->getSaslMechanism()
             ];
 
-            $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
+            $requestData = Protocol::encode(Protocol::SASL_HAND_SHAKE_REQUEST, $params);
             $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 8));
+            $ret = Protocol::decode(Protocol::SASL_HAND_SHAKE_REQUEST, substr($data, 8));
 
             $result[] = $ret;
         }
+
         return $result;
     }
 }

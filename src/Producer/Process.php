@@ -70,11 +70,11 @@ class Process extends BaseProcess
                 'data'         => $topicList,
                 'compression'  => $compression,
             ];
+
             $this->logger->log('Send producer message start, params:' . json_encode($params), 1);
             $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
             $data = $client->send($requestData);
             if ($requiredAck !== 0) { // If it is 0 the server will not send any response
-                // todo 解包失败
                 $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
                 $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 8));
                 $result[] = $ret;

@@ -59,7 +59,7 @@ class Config extends SplBean
     protected static $options = [];
 
     private static $defaults = [
-        'clientId'                      => 'kafka',
+        'clientId'                      => 'Easyswoole-kafka',
         'brokerVersion'                 => '0.10.1.0',
         'metadataBrokerList'            => '',
         'messageMaxBytes'               => 1000000,

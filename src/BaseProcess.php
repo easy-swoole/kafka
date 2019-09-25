@@ -69,7 +69,7 @@ class BaseProcess
      * @throws ConnectionException
      * @throws Exception
      */
-    protected function syncMeta(): void
+    public function syncMeta(): void
     {
         $brokerList = $this->config->getMetadataBrokerList();
         $brokerHost = [];
@@ -104,6 +104,7 @@ class BaseProcess
             if (! isset($result['brokers'], $result['topics'])) {
                 throw new Exception("Get metadata is fail, brokers or topics is null.");
             }
+
             // 更新 topics和brokers
             $broker->setData($result['topics'], $result['brokers']);
 

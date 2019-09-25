@@ -2,8 +2,8 @@
 /**
  * Created by PhpStorm.
  * User: Manlin
- * Date: 2019/9/21
- * Time: 下午11:18
+ * Date: 2019/9/24
+ * Time: 下午4:23
  */
 require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
@@ -18,8 +18,8 @@ go(function () {
 
     $config->setGroupId('test');
 
-    $group = new Group();
+    $offset = new Group();
 
-    $result = $group->joinGroup();
+    $result = $offset->describeGroups();
     var_dump($result);
 });
