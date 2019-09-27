@@ -11,7 +11,6 @@ use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\OffsetConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
-use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {

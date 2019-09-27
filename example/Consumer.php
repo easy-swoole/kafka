@@ -18,12 +18,13 @@ go(function () {
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setGroupId('test');
     $config->setBrokerVersion('1.0.0');
+
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
     $consumer = new Consumer();
 
-    $consumer->start(function ($topic, $part, $message): void {
-        var_dump($message);
+    $consumer->subscribe(function () {
+        return 1;
     });
 });

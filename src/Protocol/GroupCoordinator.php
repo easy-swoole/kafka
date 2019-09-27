@@ -42,7 +42,7 @@ class GroupCoordinator extends Protocol
         $offset          = 0;
         $errorCode       = self::unpack(self::BIT_B16_SIGNED, substr($data, $offset, 2));// errorcCode int16
         $offset         += 2;
-        $coordinatorId   = self::unpack(self::BIT_B32, substr($data, $offset, 4));// node_id int32
+        $nodeId          = self::unpack(self::BIT_B32, substr($data, $offset, 4));// node_id int32
         $offset         += 4;
         $hosts           = $this->decodeString(substr($data, $offset), self::BIT_B16);// host string
         $offset         += $hosts['length'];
@@ -51,7 +51,7 @@ class GroupCoordinator extends Protocol
 
         return [
             'errorCode'       => $errorCode,
-            'coordinatorId'   => $coordinatorId,
+            'nodeId'          => $nodeId,
             'coordinatorHost' => $hosts['data'],
             'coordinatorPort' => $coordinatorPort,
         ];
