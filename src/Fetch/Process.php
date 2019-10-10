@@ -28,18 +28,22 @@ class Process extends BaseProcess
         Protocol::init($this->config->getBrokerVersion());
         $this->getBroker()->setConfig($this->config);
 
-        $this->syncMeta();
+//        $this->syncMeta();
     }
 
     /**
+     * @param array $offsets
      * @return array
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function fetch(): array
+    public function fetch(array $offsets = []): array
     {
-        $broker          = $this->getBroker();
-        $topics          = $broker->getTopics();
+        if (empty($offsets)) {
+            return [];
+        }
+
+        $broker = $this->getBroker();
 
         $result = [];
         foreach ($this->brokerHost as $host) {
@@ -50,24 +54,26 @@ class Process extends BaseProcess
             }
 
             $data = [];
-            foreach ($topics as $topic => $partitions) {
-                foreach ($this->config->getTopics() as $topicName) {
-                    if ($topic !== $topicName) {
-                        continue;
-                    }
-                    $item = [
-                        'topic_name' => $topic,
-                        'partitions' => [],
-                    ];
-                    foreach ($partitions as $partId => $leader) {
-                        $item['partitions'][] = [
-                            'partition_id' => $partId,
-                            'offset' => 1,// todo 偏移量获取方式
-                            'max_bytes' => $this->getConfig()->getMaxBytes(),
-                        ];
-                    }
-                    $data[] = $item;
+
+            foreach ($this->config->getTopics() as $topicName) {
+                if (empty($offsets[$host])) {
+                    continue;
                 }
+
+                $item = [
+                    'topic_name' => $topicName,
+                    'partitions' => [],
+                ];
+
+                foreach ($offsets[$host] as $partition => $offset) {
+                    $item['partitions'][] = [
+                        'partition_id'      => $partition,
+                        'offset'            => $offset,
+                        'max_bytes'         => $this->getConfig()->getMaxBytes(),
+                    ];
+                }
+
+                $data[] = $item;
             }
 
             $params = [
@@ -81,7 +87,7 @@ class Process extends BaseProcess
             $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
             $data = $connect->send($requestData);
             $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
-            $result[] = $ret;
+            $result[$host] = $ret;
         }
 
         return $result;

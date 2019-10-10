@@ -23,12 +23,14 @@ go(function () {
 
     $producer = new Producer();
 
-    $result = $producer->send([
-        [
-            'topic' => 'test',
-            'value' => 'test2....message.',
-            'key'   => '',
-        ]
-    ]);
-    var_dump($result);
+    for ($i = 0; $i < 50; $i++) {
+        $producer->send([
+            [
+                'topic' => 'test',
+                'value' => 'message--' . $i,
+                'key'   => 'key--' . $i,
+            ]
+        ]);
+    }
+    var_dump('ok');
 });

@@ -12,6 +12,7 @@ use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
+use EasySwoole\Kafka;
 use EasySwoole\Kafka\Protocol\Protocol as ProtocolTool;
 use EasySwoole\Log\Logger;
 use function count;
@@ -40,10 +41,23 @@ class Process extends BaseProcess
 
     protected $brokers;
 
+    protected $isAutoCommit = true;
+
     /**
-     * @var State
+     * array(1) {
+    ["127.0.0.1:9092"]=>
+        array(3) {
+        [0]=>
+        int(-1)
+        [1]=>
+        int(-1)
+        [2]=>
+        int(-1)
+        }
+    }
+     * @var array
      */
-    private $state;
+    private $partitions = [];
 
     public function __construct(?callable $consumer = null)
     {
@@ -52,172 +66,152 @@ class Process extends BaseProcess
         $this->config = $this->getConfig();
         Protocol::init($this->config->getBrokerVersion());
         $this->getBroker()->setConfig($this->config);
-    }
 
-    public function subscribe(callable $func, $timeout = 3.0)
-    {
-        $this->init();
-        $this->state->start();
-    }
-
-    private function init2()
-    {
         $this->syncMeta();
-
-        $this->brokers = $this->getBroker()->getBrokers();
-
-        $topics = $this->getBroker()->getTopics();
-        foreach ($topics as $topic => $partitions) {
-            foreach ($this->config->getTopics() as $topicName) {
-                if ($topic !== $topicName) {
-                    continue;
-                }
-                $this->topics = [$topic => $partitions];
-            }
-        }
-        var_dump($this->topics);
-        var_dump($this->brokers);
     }
 
-    public function init(): void
+    public function setAutoCommit(bool $isAuto)
     {
-        $config = $this->getConfig();
-
-        $broker = $this->getBroker();
-        $broker->setConfig($config);
-        $broker->setProcess(function (string $data, int $fd): void {
-            $this->processRequest($data, $fd);
-        });
-
-        $this->state = State::getInstance();
-
-        $this->state->setCallback(
-            [
-                State::REQUEST_METADATA      => function (): void {
-                    $this->syncMeta();
-                },
-                State::REQUEST_GETGROUP      => function (): void {
-                    $groupProcess = new \EasySwoole\Kafka\Group\Process();
-                    $groupProcess->getGroupBrokerId();
-                },
-                State::REQUEST_JOINGROUP     => function (): void {
-                    $groupProcess = new \EasySwoole\Kafka\Group\Process();
-                    $groupProcess->joinGroup();
-                },
-                State::REQUEST_SYNCGROUP     => function (): void {
-                    $groupProcess = new \EasySwoole\Kafka\Group\Process();
-                    $groupProcess->syncGroup();
-                },
-                State::REQUEST_HEARTGROUP    => function (): void {
-                    $hearBeatProcess = new \EasySwoole\Kafka\Heartbeat\Process();
-                    $hearBeatProcess->heartbeat();
-                },
-                State::REQUEST_OFFSET        => function (): array {
-                    $offsetProcess = new \EasySwoole\Kafka\Offset\Process();
-                    return $offsetProcess->listOffset();
-                },
-                State::REQUEST_FETCH_OFFSET  => function (): void {
-                    $offsetProcess = new \EasySwoole\Kafka\Offset\Process();
-                    $offsetProcess->fetchOffset();
-                },
-                State::REQUEST_FETCH         => function (): array {
-                    $fetchProcess = new \EasySwoole\Kafka\Fetch\Process();
-                    return $fetchProcess->fetch();
-                },
-                State::REQUEST_COMMIT_OFFSET => function (): void {
-                    $offsetProcess = new \EasySwoole\Kafka\Offset\Process();
-                    $offsetProcess->commit();
-                },
-            ]
-        );
-        $this->state->init();
+        $this->isAutoCommit = $isAuto;
     }
 
     /**
-     * @param string $data
-     * @param int    $fd
+     * @param callable $func
+     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function processRequest(string $data, int $fd): void
+    public function subscribe(callable $func)
     {
-        $correlationId = ProtocolTool::unpack(ProtocolTool::BIT_B32, substr($data, 0, 4));
+        $this->joinGroup();
 
-        switch ($correlationId) {
-            case Protocol::METADATA_REQUEST:
-                $result = Protocol::decode(Protocol::METADATA_REQUEST, substr($data, 4));
+        $this->fetchOffset();
 
-                if (! isset($result['brokers'], $result['topics'])) {
-                    $this->error('Get metadata is fail, brokers or topics is null.');
-                    $this->state->failRun(State::REQUEST_METADATA);
-                    break;
+
+        // TODO: 如果没有指定分区，则随机选择有消息的分区
+        $specifyPartition = $this->getConfig()->getSpecifyPartition();
+
+        // TODO: 如果按key，则只选择key对应的消息
+        $key = $this->getConfig()->getKey();
+
+        while (1) {
+            $messages = $this->fetchMsg();
+
+            foreach ($this->brokerHost as $host) {
+                if (empty($messages[$host])) {
+                    continue;
                 }
 
-                /** @var Broker $broker */
-                $broker   = $this->getBroker();
-                $isChange = $broker->setData($result['topics'], $result['brokers']);
-                $this->state->succRun(State::REQUEST_METADATA, $isChange);
+                $topic = $messages[$host]['topics'][0]['topicName']; // topicName
 
-                break;
-            case Protocol::GROUP_COORDINATOR_REQUEST:
-                $result = Protocol::decode(Protocol::GROUP_COORDINATOR_REQUEST, substr($data, 4));
+                $partitions = $messages[$host]['topics'][0]['partitions'];
 
-                if (! isset($result['errorCode'], $result['coordinatorId']) || $result['errorCode'] !== Protocol::NO_ERROR) {
-                    $this->state->failRun(State::REQUEST_GETGROUP);
-                    break;
+                foreach ($partitions as $message) {
+                    if (empty($message['messages'])) {
+                        continue;
+                    }
+
+                    $partition = $message['partition'];
+                    $offset = $message['messages'][0]['offset'];
+
+                    // 指定消费分区
+                    if ($specifyPartition >= 0 && $specifyPartition !== $partition) {
+                        continue;
+                    }
+
+                    $ret = call_user_func($func, $message);
+                    if ($this->isAutoCommit && $ret) {
+                        $this->commit($host, $topic, $partition, $offset);
+                        var_dump($this->partitions);
+                    }
                 }
+            }
 
-                /** @var Broker $broker */
-                $broker = $this->getBroker();
-                $broker->setGroupBrokerId($result['coordinatorId']);
+            break;
+        }
+    }
 
-                $this->state->succRun(State::REQUEST_GETGROUP);
+    /**
+     * @param float $timeout
+     * @return array
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function fetchMsg(float $timeout = 3.0)
+    {
+        $fetch = new Kafka\Fetch\Process();
+        return $fetch->fetch($this->partitions);
+    }
 
-                break;
-            case Protocol::JOIN_GROUP_REQUEST:
-                $result = Protocol::decode(Protocol::JOIN_GROUP_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->succJoinGroup($result);
-                    break;
+    /**
+     * @param float $timeout
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function fetchOffset(float $timeout = 3.0)
+    {
+        $offsetProcess = new Kafka\Offset\Process();
+
+        $offsets = $offsetProcess->fetchOffset();
+
+        $partitions = [];
+        foreach ($offsets as $host => $offset) {
+            foreach ($offset['partitions'] as $partition) {
+                $partitions[$host][$partition['partition']] = $partition['offset'];
+            }
+        }
+        // 设置 分区及对应的偏移量
+        $this->setPartition($partitions);
+        var_dump($this->partitions);
+    }
+
+    public function getListOffset()
+    {
+        // 获取分区的offset列表
+    }
+
+    /**
+     * @param $host
+     * @param $topic
+     * @param $partition
+     * @param $offset
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function commit($host, $topic, $partition, $offset)
+    {
+
+        $ret = Kafka\Offset\Process::getInstance()->commit($host, $topic, $partition, $offset);
+
+        $this->partitions[$host][$partition] = $offset + 1;
+        var_dump($ret);
+    }
+
+    /**
+     * @throws Exception\Config
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function joinGroup()
+    {
+        $groupProcess = new Kafka\Group\Process();
+        $ret = $groupProcess->joinGroup();
+        $this->getConfig()->setMemberId($ret[0]['memberId']);
+        $this->getConfig()->setGenerationId($ret[0]['generationId']);
+    }
+
+    public function setPartition($partitions)
+    {
+        if (is_string($partitions)) {
+            $this->partitions[$partitions] = 0;
+        } else {
+            foreach ($partitions as $host => $value) {
+                $this->partitions[$host] = [];
+                foreach ($value as $partition => $offset) {
+                    $offset = (int)$offset < 0 ? 0 : (int)$offset;
+                    $this->partitions[$host][$partition] = $offset;
                 }
-
-                $this->failJoinGroup($result['errorCode']);
-                break;
-            case Protocol::SYNC_GROUP_REQUEST:
-                $result = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->succSyncGroup($result);
-                    break;
-                }
-
-                $this->failSyncGroup($result['errorCode']);
-                break;
-            case Protocol::HEART_BEAT_REQUEST:
-                $result = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->state->succRun(State::REQUEST_HEARTGROUP);
-                    break;
-                }
-
-                $this->failHeartbeat($result['errorCode']);
-                break;
-            case Protocol::OFFSET_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 4));
-                $this->succOffset($result, $fd);
-                break;
-            case ProtocolTool::OFFSET_FETCH_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 4));
-                $this->succFetchOffset($result);
-                break;
-            case ProtocolTool::FETCH_REQUEST:
-                $result = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 4));
-                $this->succFetch($result, $fd);
-                break;
-            case ProtocolTool::OFFSET_COMMIT_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_COMMIT_REQUEST, substr($data, 4));
-                $this->succCommit($result);
-                break;
-            default:
-                $this->error('Error request, correlationId:' . $correlationId);
+            }
         }
     }
 

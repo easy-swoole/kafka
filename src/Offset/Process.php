@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka\Offset;
 
+use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\OffsetConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
@@ -14,6 +15,8 @@ use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
 {
+    use Singleton;
+
     /**
      * Process constructor.
      * @throws \EasySwoole\Kafka\Exception\Exception
@@ -81,7 +84,7 @@ class Process extends BaseProcess
             $data = $connect->send($requestData);
             $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
 
-            $result[] = $ret;
+            $result[$host] = $ret;
         }
 
         return $result;
@@ -137,74 +140,59 @@ class Process extends BaseProcess
             $data           = $connect->send($requestData);
             $ret            = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 8));
 
-            $result[]       = $ret;
+            $result[$host]       = $ret[0];
         }
 
         return $result;
     }
 
     /**
+     * @param $host
+     * @param $topic
+     * @param $partition
+     * @param $offset
      * @return array
      * @throws \EasySwoole\Kafka\Exception\ConnectionException
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function commit(): array
+    public function commit($host, $topic, $partition, $offset): array
     {
         $broker     = $this->getBroker();
-        $topics     = $broker->getTopics();
-        $topicList  = $this->config->getTopics();
+//        $topics     = $broker->getTopics();
+//        $topicList  = $this->config->getTopics();
 
 //        $commitOffsets = $this->fetchOffset();
 
         $result     = [];
-        foreach ($this->brokerHost as $host) {
-            $connect = $broker->getMetaConnect($host);
 
-            if ($connect === null) {
-                continue;
-            }
+        $connect = $broker->getMetaConnect($host);
 
-            $data = [];
-
-            foreach ($topics as $topic => $partitions) {
-                foreach ($topicList as $topicName) {
-                    if ($topic !== $topicName) {
-                        continue;
-                    }
-                    $partition = [];
-
-                    if (isset($data[$topic]['partitions'])) {
-                        $partition = $data[$topic]['partitions'];
-                    }
-
-                    foreach ($partitions as $partId) {
-//                        if ($commitOffsets[$topic][$partId] === -1) {
-//                            continue;
-//                        }
-
-                        $partition[$partId]['partition'] = $partId;
-                        $partition[$partId]['offset']    = 5;// todo: fetchOffset返回的offset
-                    }
-
-                    $data[$topic]['partitions'] = $partition;
-                    $data[$topic]['topic_name'] = $topic;
-                }
-            }
-
-            $params = [
-                'group_id' => $this->getConfig()->getGroupId(),
-                'generation_id' => $this->getAssignment()->getGenerationId(),//todo joinGroup接口返回的generation_id
-                'member_id' => $this->getAssignment()->getMemberId(),//todo joinGroup接口返回的member_id
-                'data' => $data,
-            ];
-
-            $this->logger->log('Commit current fetch offset start, params:' . json_encode($params));
-            $requestData = Protocol::encode(Protocol::OFFSET_COMMIT_REQUEST, $params);
-            $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::OFFSET_COMMIT_REQUEST, substr($data, 8));
-
-            $result[] = $ret;
+        if ($connect === null) {
+            return [];
         }
+
+        $data = [];
+
+        $partitions[$partition]['partition'] = $partition;
+        $partitions[$partition]['offset'] = $offset;
+
+        $data[$topic]['partitions'] = $partitions;
+        $data[$topic]['topic_name'] = $topic;
+
+        $params = [
+            'group_id'  => $this->getConfig()->getGroupId(),
+            'generation_id' => $this->getConfig()->getGenerationId(),
+            'member_id' => $this->getConfig()->getMemberId(),
+            'data'      => $data,
+        ];
+
+        var_dump($params);
+        $this->logger->log('Commit current fetch offset start, params:' . json_encode($params));
+        $requestData = Protocol::encode(Protocol::OFFSET_COMMIT_REQUEST, $params);
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::OFFSET_COMMIT_REQUEST, substr($data, 8));
+
+        $result[$host] = $ret;
 
         return $result;
     }

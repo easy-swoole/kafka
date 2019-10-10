@@ -13,7 +13,6 @@ use EasySwoole\Kafka\Exception;
 /**
  * Class OffsetConfig
  * @method string getGroupId
- * @method array getTopics
  * @package EasySwoole\Kafka\Config
  */
 class OffsetConfig extends Config
@@ -24,7 +23,6 @@ class OffsetConfig extends Config
         'groupId'          => '',
         'sessionTimeout'   => 30000,
         'rebalanceTimeout' => 30000,
-        'topics'           => [],
         'offsetReset'      => 'latest', // earliest
         'maxBytes'         => 65536, // 64kb
         'maxWaitTime'      => 100,
@@ -43,18 +41,5 @@ class OffsetConfig extends Config
         }
 
         static::$options['groupId'] = $groupId;
-    }
-
-    /**
-     * @param array $topics
-     * @throws Exception\Config
-     */
-    public function setTopics(array $topics): void
-    {
-        if (empty($topics)) {
-            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
-        }
-
-        static::$options['topics'] = $topics;
     }
 }

@@ -46,6 +46,7 @@ class FetchOffset extends Protocol
     {
         $offset  = 0;
         $topics  = $this->decodeArray(substr($data, $offset), [$this, 'offsetTopic']);
+//        var_dump($topics);
         $offset += $topics['length'];
 
         return $topics['data'];

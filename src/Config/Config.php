@@ -29,6 +29,9 @@ use EasySwoole\Kafka\Exception;
  * @method string getSslPassPhrase()
  * @method string getSslCafile()
  * @method string getSslPeerName()
+ * @method array getTopics()
+ * @method string getMemberId()
+ * @method int getGenerationId()
  */
 class Config extends SplBean
 {
@@ -72,6 +75,11 @@ class Config extends SplBean
         'saslPassword'                  => '',
         'saslKeytab'                    => '',
         'saslPrincipal'                 => '',
+
+        // other info
+        'topics'                        => [],
+        'memberId'                      => '',
+        'generationId'                  => 0,
 
         // if use ssl connect
         'sslEnable'                     => false,
@@ -416,5 +424,44 @@ class Config extends SplBean
         }
 
         static::$options['sslPeerName'] = $peerName;
+    }
+
+    /**
+     * @param array $topics
+     * @throws Exception\Config
+     */
+    public function setTopics(array $topics): void
+    {
+        if (empty($topics)) {
+            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
+        }
+
+        static::$options['topics'] = $topics;
+    }
+
+    /**
+     * @param int $generationId
+     * @throws Exception\Config
+     */
+    public function setGenerationId(int $generationId): void
+    {
+        if (empty($generationId)) {
+            throw new Exception\Config('Set generation_id value is invalid, must set it int');
+        }
+
+        static::$options['generationId'] = $generationId;
+    }
+
+    /**
+     * @param string $memberId
+     * @throws Exception\Config
+     */
+    public function setMemberId(string $memberId): void
+    {
+        if (empty($memberId)) {
+            throw new Exception\Config('Set member_id value is invalid, must set it not empty string');
+        }
+
+        static::$options['memberId'] = $memberId;
     }
 }

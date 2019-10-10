@@ -80,12 +80,12 @@ class Process extends BaseProcess
                 'group_id'          => $this->getConfig()->getGroupId(),
                 'session_timeout'   => $this->getConfig()->getSessionTimeout(),
                 'rebalance_timeout' => $this->getConfig()->getRebalanceTimeout(),
-                'member_id'         => $memberId ?? '',// todo joinGroup接口返回的member_id
+                'member_id'         => $memberId ?? '',
                 'data'              => [
                     [
                         'protocol_name' => 'group',
                         'version'       => 0,
-                        'subscription'  => ['test'],// todo
+                        'subscription'  => ['The group id is ' . $this->getConfig()->getGroupId()],
                         'user_data'     => '',
                     ],
                 ],
