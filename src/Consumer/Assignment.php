@@ -36,26 +36,31 @@ class Assignment
     private $topics = [];
 
     /**
+     * 初始偏移量
      * @var int[][]
      */
     private $offsets = [];
 
     /**
+     * 分区中可支持的最大的偏移量
      * @var int[][]
      */
     private $lastOffsets = [];
 
     /**
+     * fetchOffset返回的对应偏移量
      * @var int[][]
      */
     private $fetchOffsets = [];
 
     /**
+     * 当前消费偏移量
      * @var int[][]
      */
     private $consumerOffsets = [];
 
     /**
+     * 当前提交偏移量
      * @var int[][]
      */
     private $commitOffsets = [];

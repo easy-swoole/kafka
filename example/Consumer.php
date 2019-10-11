@@ -25,7 +25,7 @@ go(function () {
     $consumer = new Consumer();
 
     $consumer->subscribe(function ($msg) {
-        var_dump($msg['messages']);
+//        var_dump($msg['messages']);
         return true;
     });
 });

@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka\Fetch;
 
+use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Config\FetchConfig;
@@ -15,9 +16,10 @@ use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
+    use Singleton;
+
     /**
      * Process constructor.
-     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
     public function __construct()
@@ -56,7 +58,7 @@ class Process extends BaseProcess
             $data = [];
 
             foreach ($this->config->getTopics() as $topicName) {
-                if (empty($offsets[$host])) {
+                if (empty($offsets[$topicName])) {
                     continue;
                 }
 
@@ -65,10 +67,10 @@ class Process extends BaseProcess
                     'partitions' => [],
                 ];
 
-                foreach ($offsets[$host] as $partition => $offset) {
+                foreach ($offsets[$topicName] as $partId => $offset) {
                     $item['partitions'][] = [
-                        'partition_id'      => $partition,
-                        'offset'            => $offset,
+                        'partition_id'      => $partId,
+                        'offset'            => $offset > 0 ? $offset: 0,
                         'max_bytes'         => $this->getConfig()->getMaxBytes(),
                     ];
                 }

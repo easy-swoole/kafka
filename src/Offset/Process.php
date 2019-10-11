@@ -84,7 +84,7 @@ class Process extends BaseProcess
             $data = $connect->send($requestData);
             $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
 
-            $result[$host] = $ret;
+            $result[$host] = $ret[0];
         }
 
         return $result;
@@ -147,21 +147,14 @@ class Process extends BaseProcess
     }
 
     /**
-     * @param $host
-     * @param $topic
-     * @param $partition
-     * @param $offset
+     * @param array $commitOffsets
      * @return array
      * @throws \EasySwoole\Kafka\Exception\ConnectionException
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function commit($host, $topic, $partition, $offset): array
+    public function commit(array $commitOffsets): array
     {
         $broker     = $this->getBroker();
-//        $topics     = $broker->getTopics();
-//        $topicList  = $this->config->getTopics();
-
-//        $commitOffsets = $this->fetchOffset();
 
         $result     = [];
 
@@ -186,7 +179,6 @@ class Process extends BaseProcess
             'data'      => $data,
         ];
 
-        var_dump($params);
         $this->logger->log('Commit current fetch offset start, params:' . json_encode($params));
         $requestData = Protocol::encode(Protocol::OFFSET_COMMIT_REQUEST, $params);
         $data = $connect->send($requestData);
