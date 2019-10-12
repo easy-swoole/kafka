@@ -60,78 +60,27 @@ class Process extends BaseProcess
     }
 
     /**
-     * @param callable $func
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function subscribe(callable $func)
+    public function subscribe()
     {
-        $this->syncMeta();
+        while (true) {
+            $this->syncMeta();
 
-        $this->joinGroup();
+            $this->getGroupBrokerId();
 
-        $this->getListOffset();
+            $this->joinGroup();
 
-        $this->fetchOffset();
+            $this->syncGroup();
 
+            $this->getListOffset();
 
-        // TODO: 如果没有指定分区，则随机选择有消息的分区
-        $specifyPartition = $this->getConfig()->getSpecifyPartition();
+            $this->fetchOffset();
 
-        // TODO: 如果按key，则只选择key对应的消息
-        $key = $this->getConfig()->getKey();
+            $this->fetchMsg();
 
-        while (1) {
-            $messages = $this->fetchMsg();
-            $this->consumeMessage();
-
-            var_dump($messages);
-
-            foreach ($this->brokerHost as $host) {
-                if (empty($messages[$host])) {
-                    continue;
-                }
-
-                $topic = $messages[$host]['topics'][0]['topicName']; // topicName
-
-                $partitions = $messages[$host]['topics'][0]['partitions'];
-
-                foreach ($partitions as $part) {
-                    if (empty($part['messages'])) {
-                        continue;
-                    }
-
-                    if ($part['errorCode'] !== 0) {
-                        continue;
-                    }
-
-                    $partition = $part['partition'];
-                    $offset = $this->getConsumerOffset($topic, $partition);
-
-                    if ($offset === null) {
-                        return;
-                    }
-
-                    foreach ($part['messages'] as $message) {
-                        $offset = $message['offset'];
-                    }
-
-                    $consumerOffset = ($part['highwaterMarkOffset'] > $offset) ? ($offset + 1) : $offset;
-                    $this->setConsumerOffset($topic, $partition, $consumerOffset);
-                    $this->setCommitOffset($topic, $partition, $offset);
-
-
-                    // 指定消费分区
-                    if ($specifyPartition >= 0 && $specifyPartition !== $partition) {
-                        continue;
-                    }
-
-                    $ret = call_user_func($func, $part);
-                    if ($this->isAutoCommit && $ret) {
-                        $this->commit($host, $topic, $partition, $offset);
-                    }
-                }
-            }
+            $this->commit();
 
             break;
         }
@@ -141,12 +90,63 @@ class Process extends BaseProcess
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
+    public function getGroupBrokerId()
+    {
+        $results = Kafka\Group\Process::getInstance()->getGroupBrokerId();
+
+        if (! isset($results['errorCode'], $results['nodeId'])
+            || $results['errorCode'] !== Protocol::NO_ERROR
+        ) {
+            // todo 错误处理
+        }
+
+        $this->getBroker()->setGroupBrokerId($results['nodeId']);
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
     public function joinGroup()
     {
-        $groupProcess = new Kafka\Group\Process();
-        $ret = $groupProcess->joinGroup();
-        $this->getAssignment()->setMemberId($ret[0]['memberId']);
-        $this->getAssignment()->setGenerationId($ret[0]['generationId']);
+        $ret = Kafka\Group\Process::getInstance()->joinGroup();
+
+        $this->getAssignment()->setMemberId($ret['memberId']);
+        $this->getAssignment()->setGenerationId($ret['generationId']);
+        $this->getAssignment()->assign($ret['members']);
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function syncGroup()
+    {
+        $result = Kafka\Group\Process::getInstance()->syncGroup();
+        $this->logger->log(sprintf('Sync group sucess, params: %s', json_encode($result)));
+
+        $topics = $this->getBroker()->getTopics();
+
+        $brokerToTopics = [];
+
+        foreach ($result['partitionAssignments'] as $topic) {
+            foreach ($topic['partitions'] as $partId) {
+                $brokerId = $topics[$topic['topicName']][$partId];
+
+                $brokerToTopics[$brokerId] = $brokerToTopics[$brokerId] ?? [];
+
+                $topicInfo = $brokerToTopics[$brokerId][$topic['topicName']] ?? [];
+
+                $topicInfo['topic_name'] = $topic['topicName'];
+
+                $topicInfo['partitions']   = $topicInfo['partitions'] ?? [];
+                $topicInfo['partitions'][] = $partId;
+
+                $brokerToTopics[$brokerId][$topic['topicName']] = $topicInfo;
+            }
+        }
+        $assign = $this->getAssignment();
+        $assign->setTopics($brokerToTopics);
     }
 
     /**
@@ -157,11 +157,10 @@ class Process extends BaseProcess
     {
         // 获取分区的offset列表
         $results        = Kafka\Offset\Process::getInstance()->listOffset();
-
         $offsets        = $this->getAssignment()->getOffsets();
         $lastOffsets    = $this->getAssignment()->getLastOffsets();
 
-        foreach ($results as $host => $topic) {
+        foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     // todo 错误处理
@@ -185,7 +184,7 @@ class Process extends BaseProcess
         $result = Kafka\Offset\Process::getInstance()->fetchOffset();
 
         $offsets = $this->getAssignment()->getFetchOffsets();
-        foreach ($result as $host => $topic) {
+        foreach ($result as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     // todo 错误处理
@@ -225,32 +224,30 @@ class Process extends BaseProcess
      */
     public function fetchMsg()
     {
-        $results = Kafka\Fetch\Process::getInstance()->fetch($this->getConsumerOffsets());
+        $results = Kafka\Fetch\Process::getInstance()->fetch($this->getAssignment()->getConsumerOffsets());
         $this->logger->log('Fetch success, result:' . json_encode($results));
 
-        foreach ($results as $host => $result) {
-            foreach ($result['topics'] as $topic) {
-                foreach ($topic['partitions'] as $part) {
-                    if ($part['errorCode'] !== 0) {
-                        // todo 错误处理
-                        continue;
-                    }
-
-                    $offset = $this->getAssignment()->getConsumerOffset($topic['topicName'], $part['partition']);
-
-                    if ($offset === null) {
-                        return [];
-                    }
-
-                    foreach ($part['messages'] as $message) {
-                        $this->messages[$topic['topicName']][$part['partition']][] = $message;
-                        $offset = $message['offset'];// 当前消息的偏移量
-                    }
-
-                    $consumerOffset = ($part['highwaterMarkOffset'] > $offset) ? ($offset + 1) : $offset;
-                    $this->getAssignment()->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
-                    $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
+        foreach ($results['topics'] as $topic) {
+            foreach ($topic['partitions'] as $part) {
+                if ($part['errorCode'] !== 0) {
+                    // todo 错误处理
+                    continue;
                 }
+
+                $offset = $this->getAssignment()->getConsumerOffset($topic['topicName'], $part['partition']);
+
+                if ($offset === null) {
+                    return [];
+                }
+
+                foreach ($part['messages'] as $message) {
+                    $this->messages[$topic['topicName']][$part['partition']][] = $message;
+                    $offset = $message['offset'];// 当前消息的偏移量
+                }
+
+                $consumerOffset = ($part['highwaterMarkOffset'] > $offset) ? ($offset + 1) : $offset;
+                $this->getAssignment()->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
+                $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
             }
         }
     }
@@ -265,7 +262,7 @@ class Process extends BaseProcess
         if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_BEFORE_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
-        $results = Kafka\Offset\Process::getInstance()->commit($this->getCommitOffsets());
+        $results = Kafka\Offset\Process::getInstance()->commit($this->getAssignment()->getCommitOffsets());
         $this->logger->log('Commit success, result:' . json_encode($results));
 
         // todo 错误处理
@@ -289,12 +286,11 @@ class Process extends BaseProcess
 
         if (in_array($errorCode, $rejoinCodes, true)) {
             if ($errorCode === Protocol::UNKNOWN_MEMBER_ID) {
-                $this->getConfig()->setMemberId('');
+                $this->getAssignment()->setMemberId('');
             }
 
             $this->getAssignment()->clearOffset();
-            $this->subscribe();
-            $this->state->rejoin();
+//            $this->state->rejoin();
             return false;
         }
 

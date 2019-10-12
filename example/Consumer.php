@@ -22,10 +22,11 @@ go(function () {
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
-    $consumer = new Consumer();
-
-    $consumer->subscribe(function ($msg) {
-//        var_dump($msg['messages']);
-        return true;
+    $consumer = new Consumer(function ($topic, $partition, $message) {
+//        var_dump($topic);
+//        var_dump($partition);
+//        var_dump($message);
     });
+
+    $consumer->subscribe();
 });

@@ -120,8 +120,8 @@ class Assignment
         $count   = 0;
         $members = [];
 
-        foreach ($topics as $topicName => $partitionition) {
-            foreach ($partitionition as $partitionId => $leaderId) {
+        foreach ($topics as $topicName => $partition) {
+            foreach ($partition as $partitionId => $leaderId) {
                 $memberNum = $count % $memberCount;
 
                 if (! isset($members[$memberNum])) {

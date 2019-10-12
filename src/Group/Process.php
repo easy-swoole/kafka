@@ -7,7 +7,9 @@
  */
 namespace EasySwoole\Kafka\Group;
 
+use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Config\GroupConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
@@ -15,6 +17,8 @@ use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
+    use Singleton;
+
     /**
      * Process constructor.
      * @throws \EasySwoole\Kafka\Exception\Exception
@@ -37,26 +41,21 @@ class Process extends BaseProcess
     {
         $broker  = $this->getBroker();
 
-        $result = [];
-        foreach ($this->brokerHost as $host) {
-            $connect = $broker->getMetaConnect($host);
-            if ($connect === null) {
-                continue;
-            }
-
-            $config = $this->getConfig();
-            $params = ['group_id' => $config->getGroupId()];
-
-            $this->logger->log('Group coordinator start, params:' . json_encode($params));
-            $requestData = Protocol::encode(Protocol::GROUP_COORDINATOR_REQUEST, $params);
-            $data = $connect->send($requestData);
-
-            $ret = Protocol::decode(Protocol::GROUP_COORDINATOR_REQUEST, substr($data, 8));
-
-            $result[] = $ret;
+        $connect = $broker->getMetaConnect(0);
+        if ($connect === null) {
+            return [];
         }
 
-        return $result;
+        $config = $this->getConfig();
+        $params = ['group_id' => ConsumerConfig::getInstance()->getGroupId()];
+
+        $this->logger->log('Group coordinator start, params:' . json_encode($params));
+        $requestData = Protocol::encode(Protocol::GROUP_COORDINATOR_REQUEST, $params);
+        $data = $connect->send($requestData);
+
+        $ret = Protocol::decode(Protocol::GROUP_COORDINATOR_REQUEST, substr($data, 8));
+
+        return $ret;
     }
 
     /**
@@ -66,40 +65,35 @@ class Process extends BaseProcess
      */
     public function joinGroup(): array
     {
-        $result = [];
-        foreach ($this->brokerHost as $host) {
-            $connect       = $this->getBroker()->getMetaConnect((string) $host);
+        $connect       = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
 
-            if ($connect === null) {
-                continue;
-            }
-
-            $memberId = '';
-
-            $params = [
-                'group_id'          => $this->getConfig()->getGroupId(),
-                'session_timeout'   => $this->getConfig()->getSessionTimeout(),
-                'rebalance_timeout' => $this->getConfig()->getRebalanceTimeout(),
-                'member_id'         => $memberId ?? '',
-                'data'              => [
-                    [
-                        'protocol_name' => 'group',
-                        'version'       => 0,
-                        'subscription'  => ['The group id is ' . $this->getConfig()->getGroupId()],
-                        'user_data'     => '',
-                    ],
-                ],
-            ];
-
-            $requestData = Protocol::encode(Protocol::JOIN_GROUP_REQUEST, $params);
-            $this->logger->log('Join group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-            $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::JOIN_GROUP_REQUEST, substr($data, 8));
-
-            $result[] = $ret;
+        if ($connect === null) {
+            return [];
         }
 
-        return $result;
+        $memberId = '';
+
+        $params = [
+            'group_id'          => $this->getConfig()->getGroupId(),
+            'session_timeout'   => $this->getConfig()->getSessionTimeout(),
+            'rebalance_timeout' => $this->getConfig()->getRebalanceTimeout(),
+            'member_id'         => $memberId ?? '',
+            'data'              => [
+                [
+                    'protocol_name' => 'group',
+                    'version'       => 0,
+                    'subscription'  => ['The group id is ' . $this->getConfig()->getGroupId()],
+                    'user_data'     => '',
+                ],
+            ],
+        ];
+
+        $requestData = Protocol::encode(Protocol::JOIN_GROUP_REQUEST, $params);
+        $this->logger->log('Join group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::JOIN_GROUP_REQUEST, substr($data, 8));
+
+        return $ret;
     }
 
     /**
@@ -143,46 +137,30 @@ class Process extends BaseProcess
      */
     public function syncGroup(): array
     {
-        $result     = [];
-        foreach ($this->brokerHost as $host) {
-            $connect = $this->getBroker()->getMetaConnect($host);
+        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
 
-            if ($connect === null) {
-                continue;
-            }
-
-            $assign       = $this->getAssignment();
-            $memberId     = $assign->getMemberId(); // //todo joinGroup接口返回的member_id
-            $generationId = $assign->getGenerationId(); //todo joinGroup接口返回的generation_id
-
-            $assign->setAssignments([[
-                'version' => 0,
-                'member_id' => 'Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107',
-                'assignments' => [[
-                    'topic_name' => 'test',
-                    'partitions' => [
-                        0
-                    ],
-                ]],
-            ]]);
-
-            $params = [
-                'group_id'      => $this->getConfig()->getGroupId(),
-                'generation_id' => $generationId ?? null,
-                'member_id'     => $memberId,
-                'data'          => $assign->getAssignments(),
-            ];
-
-            $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
-            $this->logger->log('Sync group start, params:' . json_encode($params));
-
-            $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
-
-            $result[] = $ret;
+        if ($connect === null) {
+            return [];
         }
 
-        return $result;
+        $assign       = $this->getAssignment();
+        $memberId     = $assign->getMemberId();
+        $generationId = $assign->getGenerationId();
+
+        $params = [
+            'group_id'      => $this->getConfig()->getGroupId(),
+            'generation_id' => $generationId ?? null,
+            'member_id'     => $memberId,
+            'data'          => $assign->getAssignments(),
+        ];
+
+        $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
+        $this->logger->log('Sync group start, params:' . json_encode($params));
+
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
+
+        return $ret;
     }
 
     /**

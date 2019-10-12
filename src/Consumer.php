@@ -25,17 +25,20 @@ class Consumer
 
     /**
      * Consumer constructor.
-     * @param StopStrategy|null $stopStrategy
+     * @param callable $func
      * @throws Exception\Exception
      */
-    public function __construct(?StopStrategy $stopStrategy = null)
+    public function __construct(callable $func)
     {
-        $this->stopStrategy = $stopStrategy;
-        $this->process = new Process();
+        $this->process = new Process($func);
     }
 
-    public function subscribe(callable $func)
+    /**
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function subscribe()
     {
-        $this->process->subscribe($func);
+        $this->process->subscribe();
     }
 }

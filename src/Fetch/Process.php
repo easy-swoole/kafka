@@ -47,52 +47,48 @@ class Process extends BaseProcess
 
         $broker = $this->getBroker();
 
-        $result = [];
-        foreach ($this->brokerHost as $host) {
-            $connect = $broker->getMetaConnect($host);
+        $connect = $broker->getMetaConnect($broker->getGroupBrokerId());
 
-            if ($connect === null) {
+        if ($connect === null) {
+            return [];
+        }
+
+        $data = [];
+
+        foreach ($this->config->getTopics() as $topicName) {
+            if (empty($offsets[$topicName])) {
                 continue;
             }
 
-            $data = [];
-
-            foreach ($this->config->getTopics() as $topicName) {
-                if (empty($offsets[$topicName])) {
-                    continue;
-                }
-
-                $item = [
-                    'topic_name' => $topicName,
-                    'partitions' => [],
-                ];
-
-                foreach ($offsets[$topicName] as $partId => $offset) {
-                    $item['partitions'][] = [
-                        'partition_id'      => $partId,
-                        'offset'            => $offset > 0 ? $offset: 0,
-                        'max_bytes'         => $this->getConfig()->getMaxBytes(),
-                    ];
-                }
-
-                $data[] = $item;
-            }
-
-            $params = [
-                'max_wait_time'     => $this->getConfig()->getMaxWaitTime(),
-                'min_bytes'         => $this->getConfig()->getMinBytes(),
-                'replica_id'        => -1,
-                'data'              => $data,
+            $item = [
+                'topic_name' => $topicName,
+                'partitions' => [],
             ];
 
-            $this->logger->log('Fetch message start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-            $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
-            $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
-            $result[$host] = $ret;
+            foreach ($offsets[$topicName] as $partId => $offset) {
+                $item['partitions'][] = [
+                    'partition_id'      => $partId,
+                    'offset'            => $offset > 0 ? $offset: 0,
+                    'max_bytes'         => $this->getConfig()->getMaxBytes(),
+                ];
+            }
+
+            $data[] = $item;
         }
 
-        return $result;
+        $params = [
+            'max_wait_time'     => $this->getConfig()->getMaxWaitTime(),
+            'min_bytes'         => $this->getConfig()->getMinBytes(),
+            'replica_id'        => -1,
+            'data'              => $data,
+        ];
+
+        $this->logger->log('Fetch message start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
+        $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
+
+        return $ret;
     }
 
     protected function getConfig(): FetchConfig
