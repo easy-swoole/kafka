@@ -64,17 +64,17 @@ class Broker
     }
 
     /**
-     * @return int
+     * @return mixed
      */
-    public function getGroupBrokerId(): int
+    public function getGroupBrokerId()
     {
         return $this->groupBrokerId;
     }
 
     /**
-     * @param int $groupBrokerId
+     * @param mixed $groupBrokerId
      */
-    public function setGroupBrokerId(int $groupBrokerId): void
+    public function setGroupBrokerId($groupBrokerId): void
     {
         $this->groupBrokerId = $groupBrokerId;
     }
@@ -172,10 +172,9 @@ class Broker
 
     /**
      * @param string $key
-     * @param bool   $modeSync
      * @return Client|null
      */
-    public function getMetaConnect(string $key, bool $modeSync = false): ?Client
+    public function getMetaConnect(string $key): ?Client
     {
         return $this->getConnect($key, 'metaClients');
     }
@@ -183,10 +182,9 @@ class Broker
     /**
      * 获取data链接
      * @param string $key
-     * @param bool   $modeSync
      * @return Client|null
      */
-    public function getDataConnect(string $key, bool $modeSync = false): ?Client
+    public function getDataConnect(string $key): ?Client
     {
         return $this->getConnect($key, 'dataClients');
     }
@@ -202,14 +200,12 @@ class Broker
         if (isset($this->{$type}[$key])) {
             return $this->{$type}[$key];
         }
-
         if (isset($this->brokers[$key])) {
             $hostname = $this->brokers[$key];
             if (isset($this->$type[$hostname])) {
                 return $this->$type[$hostname];
             }
         }
-
         $host = null;
         $port = null;
 

@@ -304,9 +304,16 @@ class Process extends BaseProcess
         }
     }
 
+    /**
+     * @param int        $errorCode
+     * @param array|null $context
+     * @return bool
+     * @throws \Throwable
+     */
     protected function stateConvert(int $errorCode, ?array $context = null): bool
     {
-        $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_ERROR);
+        $this->onException(new \ErrorCode(Protocol::getError($errorCode)));
+//        $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_ERROR);
 
         $recoverCodes = [
             Protocol::UNKNOWN_TOPIC_OR_PARTITION,
@@ -373,6 +380,16 @@ class Process extends BaseProcess
         }
 
         $this->messages = [];
+    }
+
+    /**
+     * @param \Throwable $throwable
+     * @param mixed      ...$args
+     * @throws \Throwable
+     */
+    protected function onException(\Throwable $throwable, ...$args)
+    {
+        throw $throwable;
     }
 
     /**

@@ -25,9 +25,9 @@ go(function () {
     $config->setAutoCommit(true);// default true
 
     $consumer = new Consumer(function ($topic, $partition, $message) {
-//        var_dump($topic);
-//        var_dump($partition);
-//        var_dump($message);
+        var_dump($topic);
+        var_dump($partition);
+        var_dump($message);
     });
 
     $consumer->subscribe();

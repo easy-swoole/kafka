@@ -66,10 +66,11 @@ class BaseProcess
     }
 
     /**
+     * @return bool
      * @throws ConnectionException
      * @throws Exception
      */
-    public function syncMeta(): void
+    public function syncMeta()
     {
         $brokerList = $this->config->getMetadataBrokerList();
         $brokerHost = [];
@@ -86,7 +87,7 @@ class BaseProcess
         $broker = $this->getBroker();
 
         foreach ($brokerHost as $host) {
-            $client = $broker->getMetaConnect($host, true);
+            $client = $broker->getMetaConnect($host);
             if (! $client->isConnected()) {
                 continue;
             }
@@ -108,7 +109,7 @@ class BaseProcess
             // 更新 topics和brokers
             $broker->setData($result['topics'], $result['brokers']);
 
-            return;
+            return true;
         }
 
         throw new ConnectionException($brokerList);
