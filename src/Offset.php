@@ -44,6 +44,7 @@ class Offset
 
     /**
      * @return array|null
+     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */

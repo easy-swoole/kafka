@@ -16,11 +16,11 @@ use EasySwoole\Kafka\Exception;
  * @method int getRebalanceTimeout()
  * @method string getOffsetReset()
  * @method int getMaxBytes()
+ * @method int getMinBytes()
  * @method int getMaxWaitTime()
  * @method array getOffsets()
  * @method string getKey()
  * @method int getSpecifyPartition()
- * @method bool getAutoCommit()
  */
 class ConsumerConfig extends Config
 {
@@ -45,11 +45,11 @@ class ConsumerConfig extends Config
         'rebalanceTimeout' => 30000,
         'offsetReset'      => 'latest', // earliest
         'maxBytes'         => 65536, // 64kb
+        'minBytes'         => 0,
         'maxWaitTime'      => 100,
         'offsets'          => [],// offset by peer partitions on the brokers
         'key'              => '',
         'specifyPartition' => -1,
-        '$autoCommit'    => true,
     ];
 
     /**
@@ -122,6 +122,32 @@ class ConsumerConfig extends Config
     }
 
     /**
+     * @param int $bytes
+     * @throws Exception\Config
+     */
+    public function setMaxBytes(int $bytes): void
+    {
+        if (empty($bytes)) {
+            throw new Exception\Config('Set consumer maxBytes value is invalid, must set it not empty int');
+        }
+
+        static::$options['maxBytes'] = $bytes;
+    }
+
+    /**
+     * @param int $bytes
+     * @throws Exception\Config
+     */
+    public function setMinBytes(int $bytes): void
+    {
+        if (empty($bytes)) {
+            throw new Exception\Config('Set consumer minBytes value is invalid, must set it not empty int');
+        }
+
+        static::$options['minBytes'] = $bytes;
+    }
+
+    /**
      * @param int $mode
      * @throws Exception\Config
      */
@@ -182,18 +208,5 @@ class ConsumerConfig extends Config
         }
 
         static::$options['specifyPartition'] = $specifyPartition;
-    }
-
-    /**
-     * @param bool $isAuto
-     * @throws Exception\Config
-     */
-    public function setAutoCommit(bool $isAuto)
-    {
-        if (in_array(strtolower($isAuto), [true, false], true)) {
-            throw new Exception\Config('Set consumer isAutoCommit value is invalid, must set TRUE or FALSE');
-        }
-
-        static::$options['autoCommit'] = $isAuto;
     }
 }

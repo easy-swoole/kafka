@@ -42,40 +42,47 @@ class Process extends BaseProcess
     }
 
     /**
-     * @throws Exception\ConnectionException
-     * @throws Exception\Exception
+     * @throws \Throwable
      */
     public function subscribe()
     {
-        if ($this->syncMeta() === false
-            || $this->getGroupBrokerId() === false
-            || $this->joinGroup() === false
-            || $this->syncGroup() === false
-        ) {
-            return false;
-        }
+        try {
+            $this->syncMeta();
 
-        while (1) {
-            if ($this->heartbeat() === false) {
-                break;
+            $this->getGroupBrokerId();
+
+            $this->joinGroup();
+
+            $this->syncGroup();
+
+            while (true) {
+                $this->heartbeat();
+
+                $this->getListOffset();
+
+                $this->fetchOffset();
+
+                $this->fetchMsg();
+
+                $this->commit();
             }
-            $this->getListOffset();
-
-            $this->fetchOffset();
-
-            $this->fetchMsg();
-
-            // 自动提交或者用户手动提交
-            if ($this->getConfig()->getAutoCommit() === true) {
-                if ($this->commit() === false) {
-                    break;
-                }
-            }
+        } catch (\Throwable $throwable) {
+            $this->onException($throwable);
         }
     }
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
+    public function syncMeta()
+    {
+        Kafka\SyncMeta\Process::getInstance()->syncMeta();
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function getGroupBrokerId()
@@ -93,6 +100,7 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function joinGroup()
@@ -108,7 +116,6 @@ class Process extends BaseProcess
                 Logger::LOG_LEVEL_ERROR
             );
             $this->stateConvert($result['errorCode']);
-            return false;
         }
 
         $this->getAssignment()->setMemberId($result['memberId']);
@@ -118,6 +125,7 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function syncGroup()
@@ -130,7 +138,6 @@ class Process extends BaseProcess
                 Logger::LOG_LEVEL_ERROR
             );
             $this->stateConvert($result['errorCode']);
-            return false;
         }
 
         $topics = $this->getBroker()->getTopics();
@@ -159,6 +166,7 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function getListOffset()
@@ -186,6 +194,7 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function heartbeat()
@@ -194,12 +203,12 @@ class Process extends BaseProcess
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
             $this->logger->log('Heartbeat error, errorCode:' . $result['errorCode']);
             $this->stateConvert($result['errorCode']);
-            return false;
         }
     }
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function fetchOffset()
@@ -241,6 +250,7 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function fetchMsg()
@@ -278,6 +288,7 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function commit()
@@ -293,7 +304,6 @@ class Process extends BaseProcess
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     $this->stateConvert($part['errorCode']);
-                    return false;
                 }
             }
         }
@@ -307,14 +317,10 @@ class Process extends BaseProcess
     /**
      * @param int        $errorCode
      * @param array|null $context
-     * @return bool
-     * @throws \Throwable
+     * @throws Exception\ErrorCodeException
      */
-    protected function stateConvert(int $errorCode, ?array $context = null): bool
+    protected function stateConvert(int $errorCode, ?array $context = null)
     {
-        $this->onException(new \ErrorCode(Protocol::getError($errorCode)));
-//        $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_ERROR);
-
         $recoverCodes = [
             Protocol::UNKNOWN_TOPIC_OR_PARTITION,
             Protocol::NOT_LEADER_FOR_PARTITION,
@@ -336,17 +342,14 @@ class Process extends BaseProcess
 
         if (in_array($errorCode, $recoverCodes, true)) {
             $this->getAssignment()->clearOffset();
-            return false;
         }
 
         if (in_array($errorCode, $rejoinCodes, true)) {
             if ($errorCode === Protocol::UNKNOWN_MEMBER_ID) {
                 $this->getAssignment()->setMemberId('');
-                return false;
             }
 
             $this->getAssignment()->clearOffset();
-            return false;
         }
 
         if ($errorCode === Protocol::OFFSET_OUT_OF_RANGE) {
@@ -361,7 +364,7 @@ class Process extends BaseProcess
             }
         }
 
-        return true;
+        throw new Exception\ErrorCodeException(Protocol::getError($errorCode));
     }
 
     /**

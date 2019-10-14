@@ -20,6 +20,9 @@ go(function () {
 
     $config->setTopics(['test']);
 
+    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+
     $fetch = new Fetch();
     $result = $fetch->fetch();
     var_dump($result);

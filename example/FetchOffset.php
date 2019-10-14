@@ -19,6 +19,8 @@ go(function () {
     $config->setGroupId('test');
     $config->setTopics(['test']);
 
+    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
     $offset = new Offset();
 
     $result = $offset->fetchOffset();

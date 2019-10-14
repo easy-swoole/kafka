@@ -13,7 +13,7 @@ use EasySwoole\Kafka\Config\HeartBeatConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 
 go(function () {
-    $config = new HeartBeatConfig();
+    $config = new \EasySwoole\Kafka\Config\ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0.1');
 
@@ -22,6 +22,8 @@ go(function () {
     $assign = Assignment::getInstance();
     $assign->setGenerationId(2);
     $assign->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
+
+    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $heartbeat = new Heartbeat();
 

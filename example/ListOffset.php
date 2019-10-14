@@ -16,8 +16,10 @@ go(function () {
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
 
-    $config->setGroupId('connect-fast-data');
-    $config->setTopics(['test']);
+    $config->setGroupId('test');
+
+    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $offset = new Offset();
 

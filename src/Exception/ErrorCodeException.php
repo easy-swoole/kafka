@@ -5,4 +5,6 @@
  * Date: 2019/10/14
  * Time: 下午3:58
  */
-class ErrorCode extends Exception{}
+namespace EasySwoole\Kafka\Exception;
+
+class ErrorCodeException extends Exception{}

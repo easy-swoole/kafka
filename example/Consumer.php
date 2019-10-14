@@ -22,8 +22,6 @@ go(function () {
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
-    $config->setAutoCommit(true);// default true
-
     $consumer = new Consumer(function ($topic, $partition, $message) {
         var_dump($topic);
         var_dump($partition);

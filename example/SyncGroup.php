@@ -23,6 +23,8 @@ go(function () {
     $assign->setGenerationId(1);
     $assign->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
 
+    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+
     $offset = new Group();
 
     $result = $offset->syncGroup();

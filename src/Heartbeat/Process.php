@@ -11,35 +11,25 @@ use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
+use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
     use Singleton;
-    /**
-     * Process constructor.
-     * @throws \EasySwoole\Kafka\Exception\Exception
-     */
-    public function __construct()
-    {
-        parent::__construct();
-
-        $this->config = $this->getConfig();
-        Protocol::init($this->config->getBrokerVersion());
-        $this->getBroker()->setConfig($this->config);
-    }
 
     /**
      * @return array
-     * @throws \EasySwoole\Kafka\Exception\ConnectionException
+     * @throws ConnectionException
+     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function heartbeat(): array
     {
         $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
         if ($connect === null) {
-            return [];
+            throw new ConnectionException();
         }
 
         $params = [

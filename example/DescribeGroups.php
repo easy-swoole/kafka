@@ -20,6 +20,8 @@ go(function () {
 
     $offset = new Group();
 
+    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+
     $result = $offset->describeGroups();
     var_dump($result);
 });

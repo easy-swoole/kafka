@@ -18,23 +18,11 @@ go(function () {
 
     $config->setGroupId('test');
 
+    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+
+    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
     $group = new Group();
 
     $result = $group->findCoordinator();
     var_dump($result);
-    /**
-     * array(1) {
-            [0]=>
-            array(4) {
-                ["errorCode"]=>
-                int(0)
-                ["coordinatorId"]=>
-                int(0)
-                ["coordinatorHost"]=>
-                string(9) "127.0.0.1"
-                ["coordinatorPort"]=>
-                int(9092)
-            }
-        }
-     */
 });
