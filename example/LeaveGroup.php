@@ -16,14 +16,14 @@ go(function () {
     $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
-
     $config->setGroupId('test');
 
-    Assignment::getInstance()->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
-
-    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $group = new Group();
+    $ret = $group->joinGroup();
+    Assignment::getInstance()->setMemberId($ret['memberId']);// 测试leaveGroup需要先生成MemberId，如果知道该参数，可直接赋值测试
+    //Assignment::getInstance()->setMemberId('Easyswoole-kafka-312727ba-2e59-4f14-8b6d-9edc870fc7f4');
 
     $result = $group->leaveGroup();
     var_dump($result);

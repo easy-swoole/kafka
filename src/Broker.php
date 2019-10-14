@@ -10,7 +10,6 @@ namespace EasySwoole\Kafka;
 use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\Sasl\Plain;
-use EasySwoole\Log\Logger;
 use EasySwoole\Kafka\Exception;
 
 class Broker
@@ -41,11 +40,6 @@ class Broker
      * @var BaseProcess
      */
     private $process;
-
-    /**
-     * @var Logger
-     */
-    private $logger;
 
     /**
      * @return mixed
@@ -112,21 +106,11 @@ class Broker
     }
 
     /**
-     * @return mixed
+     * @param array $topics
+     * @param array $brokersResult
+     * @return bool
+     * @throws Exception\ErrorCodeException
      */
-    public function getLogger()
-    {
-        return $this->logger;
-    }
-
-    /**
-     * @param mixed $logger
-     */
-    public function setLogger($logger): void
-    {
-        $this->logger = $logger;
-    }
-
     public function setData(array $topics, array $brokersResult): bool
     {
         $brokers = [];
@@ -147,8 +131,7 @@ class Broker
         $newTopics = [];
         foreach ($topics as $topic) {
             if ((int) $topic['errorCode'] !== Protocol::NO_ERROR) {
-                $this->logger->log('Parse metadata for topic is error, error:'
-                    . Protocol::getError($topic['errorCode']));
+                throw new Exception\ErrorCodeException();
                 continue;
             }
 
@@ -173,6 +156,7 @@ class Broker
     /**
      * @param string $key
      * @return Client|null
+     * @throws Exception\Exception
      */
     public function getMetaConnect(string $key): ?Client
     {
@@ -180,9 +164,9 @@ class Broker
     }
 
     /**
-     * 获取data链接
      * @param string $key
      * @return Client|null
+     * @throws Exception\Exception
      */
     public function getDataConnect(string $key): ?Client
     {
@@ -193,6 +177,7 @@ class Broker
      * @param string $key
      * @param string $type
      * @return Client|null
+     * @throws Exception\Exception
      */
     public function getConnect(string $key, string $type): ?Client
     {
@@ -222,7 +207,6 @@ class Broker
         if ($host === null || $port === null) {
             return null;
         }
-        $this->logger = new Logger();
         try {
             $client = $this->getClient((string)$host, (int)$port);
             if ($client->connect()) {
@@ -230,7 +214,7 @@ class Broker
                 return $client;
             }
         } catch (\Throwable $exception) {
-            $this->logger->log($exception->getMessage(), Logger::LOG_LEVEL_ERROR);
+            throw new Exception\Exception($exception);
         }
         return null;
     }
@@ -251,6 +235,7 @@ class Broker
 
     /**
      * @return Client|null
+     * @throws Exception\Exception
      */
     public function getRandConnect(): ?Client
     {

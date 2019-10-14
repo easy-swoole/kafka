@@ -43,12 +43,12 @@ class Offset
     }
 
     /**
-     * @return array|null
+     * @return array
      * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function commit(): ?array
+    public function commit(): array
     {
         return $this->process->commit();
     }

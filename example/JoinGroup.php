@@ -15,13 +15,11 @@ go(function () {
     $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
-
     $config->setGroupId('test');
 
-    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $group = new Group();
-
     $result = $group->joinGroup();
     var_dump($result);
 });

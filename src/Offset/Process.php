@@ -26,7 +26,7 @@ class Process extends BaseProcess
     public function listOffset(): array
     {
         $topics     = $this->getBroker()->getTopics();
-        $topicList  = $this->config->getTopics();
+        $topicList  = ConsumerConfig::getInstance()->getTopics();
 
         $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
 
@@ -62,7 +62,6 @@ class Process extends BaseProcess
             'data'       => $data,
         ];
 
-        $this->logger->log('listOffset start, params:' . json_encode($params));
         $requestData = Protocol::encode(Protocol::OFFSET_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
@@ -73,6 +72,7 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
+     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function fetchOffset(): array
@@ -109,11 +109,10 @@ class Process extends BaseProcess
         }
 
         $params = [
-            'group_id' => $this->config->getGroupId(),
+            'group_id' => ConsumerConfig::getInstance()->getGroupId(),
             'data'     => $data,
         ];
 
-        $this->logger->log('Fetch Offset start, params:' . json_encode($params));
         $requestData    = Protocol::encode(Protocol::OFFSET_FETCH_REQUEST, $params);
         $data           = $connect->send($requestData);
         $ret            = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 8));
@@ -128,7 +127,7 @@ class Process extends BaseProcess
      * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function commit(array $commitOffsets): array
+    public function commit(array $commitOffsets = []): array
     {
         $data = [];
         $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
@@ -155,7 +154,6 @@ class Process extends BaseProcess
             'data'      => $data,
         ];
 
-        $this->logger->log('Commit current fetch offset start, params:' . json_encode($params));
         $requestData = Protocol::encode(Protocol::OFFSET_COMMIT_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::OFFSET_COMMIT_REQUEST, substr($data, 8));

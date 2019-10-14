@@ -18,7 +18,7 @@ go(function () {
 
     $apiVersions = new ApiVersions();
 
-    \EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $result = $apiVersions->getVersions();
     var_dump($result);

@@ -9,10 +9,10 @@ require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Offset;
-use EasySwoole\Kafka\Config\OffsetConfig;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 
 go(function () {
-    $config = new OffsetConfig();
+    $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
 

@@ -21,6 +21,8 @@ use EasySwoole\Kafka\Exception;
  * @method array getOffsets()
  * @method string getKey()
  * @method int getSpecifyPartition()
+ * @method array getTopics()
+ * @method bool getConsumeStatus()
  */
 class ConsumerConfig extends Config
 {
@@ -50,6 +52,8 @@ class ConsumerConfig extends Config
         'offsets'          => [],// offset by peer partitions on the brokers
         'key'              => '',
         'specifyPartition' => -1,
+        'topics'           => [],
+        'consumeStatus'    => true,//todo
     ];
 
     /**
@@ -208,5 +212,31 @@ class ConsumerConfig extends Config
         }
 
         static::$options['specifyPartition'] = $specifyPartition;
+    }
+
+    /**
+     * @param array $topics
+     * @throws Exception\Config
+     */
+    public function setTopics(array $topics): void
+    {
+        if (empty($topics)) {
+            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
+        }
+
+        static::$options['topics'] = $topics;
+    }
+
+    /**
+     * @param bool $consumeStatus
+     * @throws Exception\Config
+     */
+    public function setConsumeStatus(bool $consumeStatus)
+    {
+        if (! in_array($consumeStatus, [true, false], true)) {
+            throw new Exception\Config('Set consumer $specifyPartition value is invalid, must set bool');
+        }
+
+        static::$options['consumeStatus'] = $consumeStatus;
     }
 }

@@ -13,7 +13,6 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Protocol;
-use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
@@ -38,7 +37,6 @@ class Process extends BaseProcess
             'member_id'     => Assignment::getInstance()->getMemberId(),
         ];
 
-        $this->logger->log('Heartbeat params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
         $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 8));

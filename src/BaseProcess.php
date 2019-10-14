@@ -9,15 +9,9 @@ namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\Exception\Exception;
-use EasySwoole\Log\Logger;
 
 class BaseProcess
 {
-    /**
-     * @var Logger
-     */
-    protected $logger;
-
     /**
      * @var Config
      */
@@ -34,7 +28,6 @@ class BaseProcess
      */
     public function __construct()
     {
-        $this->logger       = new Logger();
         $this->config       = $this->getConfig();
         $this->brokerHost   = $this->getBrokerLists();
         $this->getBroker()->setConfig($this->config);

@@ -11,9 +11,7 @@ use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
-use EasySwoole\Kafka\Config\FetchConfig;
 use EasySwoole\Kafka\Protocol;
-use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
@@ -39,7 +37,7 @@ class Process extends BaseProcess
 
         $data = [];
 
-        foreach ($this->config->getTopics() as $topicName) {
+        foreach (ConsumerConfig::getInstance()->getTopics() as $topicName) {
             if (empty($offsets[$topicName])) {
                 continue;
             }
@@ -67,7 +65,6 @@ class Process extends BaseProcess
             'data'              => $data,
         ];
 
-        $this->logger->log('Fetch message start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
         $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));

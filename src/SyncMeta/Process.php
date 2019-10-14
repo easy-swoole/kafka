@@ -45,7 +45,6 @@ class Process extends BaseProcess
             }
 
             $params = [];
-            $this->logger->log('Start sync metadata request params:' . json_encode($params));
 
             $requestData = Protocol::encode(Protocol::METADATA_REQUEST, $params);
             $data = $client->send($requestData);
@@ -60,7 +59,6 @@ class Process extends BaseProcess
 
             // 更新 topics和brokers
             $broker->setData($result['topics'], $result['brokers']);
-
             return true;
         }
 

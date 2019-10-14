@@ -12,7 +12,6 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
-use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
@@ -65,6 +64,8 @@ class Process extends BaseProcess
                 $this->fetchMsg();
 
                 $this->commit();
+
+                usleep($this->getConfig()->getRefreshIntervalMs() * 1000);
             }
         } catch (\Throwable $throwable) {
             $this->onException($throwable);
@@ -107,14 +108,6 @@ class Process extends BaseProcess
     {
         $result = Kafka\Group\Process::getInstance()->joinGroup();
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
-            $this->logger->log(
-                sprintf(
-                    'Join group fail, need rejoin, errorCode %d, memberId: %s',
-                    $result['errorCode'],
-                    $this->getAssignment()->getMemberId()
-                ),
-                Logger::LOG_LEVEL_ERROR
-            );
             $this->stateConvert($result['errorCode']);
         }
 
@@ -131,12 +124,7 @@ class Process extends BaseProcess
     public function syncGroup()
     {
         $result = Kafka\Group\Process::getInstance()->syncGroup();
-        $this->logger->log(sprintf('Sync group sucess, params: %s', json_encode($result)));
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
-            $this->logger->log(
-                sprintf('Sync group fail, need rejoin, errorCode %d', $result['errorCode']),
-                Logger::LOG_LEVEL_ERROR
-            );
             $this->stateConvert($result['errorCode']);
         }
 
@@ -201,7 +189,6 @@ class Process extends BaseProcess
     {
         $result = Kafka\Heartbeat\Process::getInstance()->heartbeat();
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
-            $this->logger->log('Heartbeat error, errorCode:' . $result['errorCode']);
             $this->stateConvert($result['errorCode']);
         }
     }
@@ -256,7 +243,6 @@ class Process extends BaseProcess
     public function fetchMsg()
     {
         $results = Kafka\Fetch\Process::getInstance()->fetch($this->getAssignment()->getConsumerOffsets());
-        $this->logger->log('Fetch success, result:' . json_encode($results));
 
         foreach ($results['topics'] as $topic) {
             foreach ($topic['partitions'] as $part) {
@@ -298,7 +284,6 @@ class Process extends BaseProcess
             $this->consumeMessage();
         }
         $results = Kafka\Offset\Process::getInstance()->commit($this->getAssignment()->getCommitOffsets());
-        $this->logger->log('Commit success, result:' . json_encode($results));
 
         foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
