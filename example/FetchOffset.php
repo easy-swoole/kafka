@@ -15,7 +15,6 @@ go(function () {
     $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
-
     $config->setGroupId('test');
     $config->setTopics(['test']);
 
