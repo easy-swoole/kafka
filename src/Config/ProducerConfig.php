@@ -19,7 +19,6 @@ use EasySwoole\Kafka\Exception;
  * @method int getProduceInterval()
  * @method int getTimeout()
  * @method int getRequiredAck()
- * @method bool getIsAsyn()
  * @method int getCompression()
  */
 class ProducerConfig extends Config
@@ -34,11 +33,10 @@ class ProducerConfig extends Config
     ];
 
     protected static $defaults = [
-        'requiredAck'    => 1,
-        'timeout'       => 5000,
-        'isAsyn'        => false,
-        'requestTimeout'    => 6000,
-        'produceInterval'   => 100,
+        'requiredAck'       => 1,
+        'timeout'           => 5000,
+        'requestTimeout'    => 6000,//todo
+        'produceInterval'   => 100,//todo
         'compression'       => Protocol::COMPRESSION_NONE,
     ];
 
@@ -92,14 +90,6 @@ class ProducerConfig extends Config
         }
 
         static::$options['requiredAck'] = $requiredAck;
-    }
-
-    /**
-     * @param bool $asyn
-     */
-    public function setIsAsyn(bool $asyn): void
-    {
-        static::$options['isAsyn'] = $asyn;
     }
 
     /**

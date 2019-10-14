@@ -12,10 +12,8 @@ use EasySwoole\Kafka\Exception;
  * @method string getClientId()
  * @method string getBrokerVersion()
  * @method string getMetadataBrokerList()
- * @method int getMessageMaxBytes()
- * @method int getMetadataRequestTimeoutMs()
- * @method int getMetadataRefreshIntervalMs()
- * @method int getMetadataMaxAgeMs()
+ * @method int getRequestTimeoutMs()
+ * @method int getRefreshIntervalMs()
  * @method string getSecurityProtocol()
  * @method string getSaslMechanism()
  * @method string getSaslUsername()
@@ -29,9 +27,6 @@ use EasySwoole\Kafka\Exception;
  * @method string getSslPassPhrase()
  * @method string getSslCafile()
  * @method string getSslPeerName()
- * @method array getTopics()
- * @method string getMemberId()
- * @method int getGenerationId()
  */
 class Config extends SplBean
 {
@@ -65,21 +60,14 @@ class Config extends SplBean
         'clientId'                      => 'Easyswoole-kafka',
         'brokerVersion'                 => '0.10.1.0',
         'metadataBrokerList'            => '',
-        'messageMaxBytes'               => 1000000,
-        'metadataRequestTimeoutMs'      => 60000,
-        'metadataRefreshIntervalMs'     => 300000,
-        'metadataMaxAgeMs'              => -1,
+        'requestTimeoutMs'              => 60000,// todo
+        'refreshIntervalMs'             => 10000,
         'securityProtocol'              => self::SECURITY_PROTOCOL_PLAINTEXT,
         'saslMechanism'                 => self::SASL_MECHANISMS_PLAIN,
         'saslUsername'                  => '',
         'saslPassword'                  => '',
         'saslKeytab'                    => '',
         'saslPrincipal'                 => '',
-
-        // other info
-        'topics'                        => [],
-        'memberId'                      => '',
-        'generationId'                  => 0,
 
         // if use ssl connect
         'sslEnable'                     => false,
@@ -197,55 +185,29 @@ class Config extends SplBean
     }
 
     /**
-     * @param int $messageMaxBytes
+     * @param int $requestTimeoutMs
      * @throws Exception\Config
      */
-    public function setMessageMaxBytes(int $messageMaxBytes): void
+    public function setRequestTimeoutMs(int $requestTimeoutMs): void
     {
-        if ($messageMaxBytes < 1000 || $messageMaxBytes > 1000000000) {
-            throw new Exception\Config("Set message ma bytes value is invalid, must set it 100 .. 1000000000.");
+        if ($requestTimeoutMs < 10 || $requestTimeoutMs > 900000) {
+            throw new Exception\Config("Set request timeout value is invalid, must set it 10 .. 900000.");
         }
 
-        static::$options['messageMaxBytes'] = $messageMaxBytes;
+        static::$options['requestTimeoutMs'] = $requestTimeoutMs;
     }
 
     /**
-     * @param int $metadataRequestTimeoutMs
+     * @param int $refreshIntervalMs
      * @throws Exception\Config
      */
-    public function setMetadataRequestTimeoutMs(int $metadataRequestTimeoutMs): void
+    public function setRefreshIntervalMs(int $refreshIntervalMs): void
     {
-        if ($metadataRequestTimeoutMs < 10 || $metadataRequestTimeoutMs > 900000) {
-            throw new Exception\Config("Set metadata request timeout value is invalid, must set it 10 .. 900000.");
+        if ($refreshIntervalMs < 10 || $refreshIntervalMs > 360000) {
+            throw new Exception\Config("Set refresh interval value is invalid, must set it 10 .. 360000.");
         }
 
-        static::$options['metadataRequestTimeoutMs'] = $metadataRequestTimeoutMs;
-    }
-
-    /**
-     * @param int $metadataRefreshIntervalMs
-     * @throws Exception\Config
-     */
-    public function setMetadataRefreshIntervalMs(int $metadataRefreshIntervalMs): void
-    {
-        if ($metadataRefreshIntervalMs < 10 || $metadataRefreshIntervalMs > 3600000) {
-            throw new Exception\Config("Set metadata refresh interval value is invalid, must set it 10 .. 3600000.");
-        }
-
-        static::$options['metadataRefreshIntervalMs'] = $metadataRefreshIntervalMs;
-    }
-
-    /**
-     * @param int $metadataMaxAgeMs
-     * @throws Exception\Config
-     */
-    public function setMetadataMaxAgeMs(int $metadataMaxAgeMs): void
-    {
-        if ($metadataMaxAgeMs < 1 || $metadataMaxAgeMs > 86400000) {
-            throw new Exception\Config("Set metadata max age value is invalid, must set it 1 .. 86400000.");
-        }
-
-        static::$options['metadataMaxAgeMs'] = $metadataMaxAgeMs;
+        static::$options['refreshIntervalMs'] = $refreshIntervalMs;
     }
 
     /**
@@ -424,44 +386,5 @@ class Config extends SplBean
         }
 
         static::$options['sslPeerName'] = $peerName;
-    }
-
-    /**
-     * @param array $topics
-     * @throws Exception\Config
-     */
-    public function setTopics(array $topics): void
-    {
-        if (empty($topics)) {
-            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
-        }
-
-        static::$options['topics'] = $topics;
-    }
-
-    /**
-     * @param int $generationId
-     * @throws Exception\Config
-     */
-    public function setGenerationId(int $generationId): void
-    {
-        if (empty($generationId)) {
-            throw new Exception\Config('Set generation_id value is invalid, must set it int');
-        }
-
-        static::$options['generationId'] = $generationId;
-    }
-
-    /**
-     * @param string $memberId
-     * @throws Exception\Config
-     */
-    public function setMemberId(string $memberId): void
-    {
-        if (empty($memberId)) {
-            throw new Exception\Config('Set member_id value is invalid, must set it not empty string');
-        }
-
-        static::$options['memberId'] = $memberId;
     }
 }

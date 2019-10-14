@@ -7,7 +7,6 @@
  */
 namespace EasySwoole\Kafka;
 
-
 use EasySwoole\Kafka\SaslHandShake\Process;
 
 class SaslHandShake

@@ -24,6 +24,7 @@ class Group
 
     /**
      * @return array
+     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
@@ -44,6 +45,7 @@ class Group
 
     /**
      * @return array
+     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
@@ -64,6 +66,7 @@ class Group
 
     /**
      * @return array
+     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */

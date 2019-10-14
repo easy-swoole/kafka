@@ -8,17 +8,17 @@
 require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
-use EasySwoole\Kafka\Config\FetchConfig;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Fetch;
 
 go(function () {
 
-    $config = FetchConfig::getInstance();
-    $config->setMetadataRefreshIntervalMs(10000);
+    $config = ConsumerConfig::getInstance();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0');
 
-    $config->setTopics(['test']);
+    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
     $fetch = new Fetch();
     $result = $fetch->fetch();

@@ -15,7 +15,6 @@ class Fetch
 
     /**
      * Fetch constructor.
-     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
     public function __construct()

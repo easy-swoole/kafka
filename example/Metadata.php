@@ -9,16 +9,14 @@ require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Config\Config;
-use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\SyncMeta\Process;
 
 go(function () {
 
     $config = new Config();
-    $config->setMetadataRefreshIntervalMs(10000);
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0');
 
-    $metaData = new BaseProcess();
-
+    $metaData = new Process();
     $metaData->syncMeta();
 });

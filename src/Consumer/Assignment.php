@@ -153,7 +153,7 @@ class Assignment
             ];
         }
 
-        $this->assignments = $data;
+        $this->setAssignments($data);
     }
 
     /**

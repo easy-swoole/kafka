@@ -14,20 +14,19 @@ use EasySwoole\Kafka\Consumer;
 go(function () {
 
     $config = ConsumerConfig::getInstance();
-    $config->setMetadataRefreshIntervalMs(10000);
+    $config->setRefreshIntervalMs(1000);
     $config->setMetadataBrokerList('127.0.0.1:9092');
+    $config->setBrokerVersion('0.9.0');
     $config->setGroupId('test');
     $config->setBrokerVersion('1.0.0');
 
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
-    $config->setAutoCommit(true);// default true
-
     $consumer = new Consumer(function ($topic, $partition, $message) {
-//        var_dump($topic);
-//        var_dump($partition);
-//        var_dump($message);
+        var_dump($topic);
+        var_dump($partition);
+        var_dump($message);
     });
 
     $consumer->subscribe();

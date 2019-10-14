@@ -31,7 +31,7 @@ class Process extends BaseProcess
         $this->config = $this->getConfig();
         $this->getBroker()->setConfig($this->config);
 
-        $this->syncMeta();
+        \EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
     }
 
     /**
@@ -58,7 +58,7 @@ class Process extends BaseProcess
         $sendData   = $this->convertRecordSet($recordSet);
         $result     = [];
         foreach ($sendData as $brokerId => $topicList) {
-            $client = $broker->getDataConnect((string) $brokerId, true);
+            $client = $broker->getDataConnect((string) $brokerId);
             if ($client === null || ! $client->isConnected()) {
                 return [];
             }
@@ -71,7 +71,6 @@ class Process extends BaseProcess
                 'compression'  => $compression,
             ];
 
-            $this->logger->log('Send producer message start, params:' . json_encode($params), 1);
             $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
             $data = $client->send($requestData);
             if ($requiredAck !== 0) { // If it is 0 the server will not send any response

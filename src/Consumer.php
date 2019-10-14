@@ -7,17 +7,11 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Process;
-use EasySwoole\Kafka\Consumer\StopStrategy;
 
 class Consumer
 {
-
-    /**
-     * @var StopStrategy|null
-     */
-    private $stopStrategy;
-
     /**
      * @var Process|null
      */
@@ -25,20 +19,29 @@ class Consumer
 
     /**
      * Consumer constructor.
-     * @param callable $func
+     * @param callable|null $func
      * @throws Exception\Exception
      */
-    public function __construct(callable $func)
+    public function __construct(?callable $func = null)
     {
         $this->process = new Process($func);
     }
 
     /**
-     * @throws Exception\ConnectionException
-     * @throws Exception\Exception
+     * @throws \Throwable
      */
     public function subscribe()
     {
         $this->process->subscribe();
+    }
+
+
+    /**
+     * @throws Exception\Config
+     */
+    public function stop()
+    {
+        // todo
+        ConsumerConfig::getInstance()->setConsumeStatus(false);
     }
 }

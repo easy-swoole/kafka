@@ -43,12 +43,14 @@ class Offset
     }
 
     /**
-     * @return array|null
+     * @param array $commitOffsets
+     * @return array
+     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function commit(): ?array
+    public function commit(array $commitOffsets = []): array
     {
-        return $this->process->commit();
+        return $this->process->commit($commitOffsets);
     }
 }
