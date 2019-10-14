@@ -7,26 +7,27 @@
  */
 namespace EasySwoole\Kafka\Heartbeat;
 
+use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\Config\ConsumerConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
+use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
-
+    use Singleton;
     /**
      * Process constructor.
+     * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function __construct()
     {
         parent::__construct();
 
-        $config = $this->getConfig();
-        Protocol::init($config->getBrokerVersion());
-
-        $broker = $this->getBroker();
-        $broker->setConfig($config);
-
-        $this->syncMeta();
+        $this->config = $this->getConfig();
+        Protocol::init($this->config->getBrokerVersion());
+        $this->getBroker()->setConfig($this->config);
     }
 
     /**
@@ -36,33 +37,21 @@ class Process extends BaseProcess
      */
     public function heartbeat(): array
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
-
+        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
         if ($connect === null) {
             return [];
         }
 
-        $assign   = $this->getAssignment();
-        $memberId = $assign->getMemberId();
-
-        if (trim($memberId) === '') {
-            return [];
-        }
-
-        $generationId = $assign->getGenerationId();
-
         $params = [
-            'group_id'      => $this->getConfig()->getGroupId(),
-            'generation_id' => $generationId,
-            'member_id'     => $memberId,
+            'group_id'      => ConsumerConfig::getInstance()->getGroupId(),
+            'generation_id' => Assignment::getInstance()->getGenerationId(),
+            'member_id'     => Assignment::getInstance()->getMemberId(),
         ];
 
+        $this->logger->log('Heartbeat params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
         $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
         $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 4));
-
+        $ret = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 8));
         return $ret;
     }
 }

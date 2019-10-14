@@ -43,9 +43,8 @@ class Offset
     }
 
     /**
-     * todo
      * @return array|null
-     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
     public function commit(): ?array

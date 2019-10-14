@@ -2,19 +2,20 @@
 /**
  * Created by PhpStorm.
  * User: Manlin
- * Date: 2019/9/19
- * Time: 下午1:43
+ * Date: 2019/9/24
+ * Time: 下午5:46
  */
 namespace EasySwoole\Kafka;
 
-use EasySwoole\Kafka\Heartbeat\Process;
 
-class Heartbeat
+use EasySwoole\Kafka\SaslHandShake\Process;
+
+class SaslHandShake
 {
     private $process;
 
     /**
-     * Heartbeat constructor.
+     * SaslHandShake constructor.
      * @throws Exception\Exception
      */
     public function __construct()
@@ -23,12 +24,11 @@ class Heartbeat
     }
 
     /**
-     * @return array
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function beat()
+    public function handShake()
     {
-        return $this->process->heartbeat();
+        return $this->process->handShake();
     }
 }

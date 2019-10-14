@@ -12,12 +12,15 @@ use EasySwoole\Kafka\Exception;
 
 /**
  * @method string|false ietGroupId()
- * @method array|false ietTopics()
  * @method int getSessionTimeout()
  * @method int getRebalanceTimeout()
  * @method string getOffsetReset()
  * @method int getMaxBytes()
  * @method int getMaxWaitTime()
+ * @method array getOffsets()
+ * @method string getKey()
+ * @method int getSpecifyPartition()
+ * @method bool getAutoCommit()
  */
 class ConsumerConfig extends Config
 {
@@ -40,10 +43,13 @@ class ConsumerConfig extends Config
         'groupId'          => '',
         'sessionTimeout'   => 30000,
         'rebalanceTimeout' => 30000,
-        'topics'           => [],
         'offsetReset'      => 'latest', // earliest
         'maxBytes'         => 65536, // 64kb
         'maxWaitTime'      => 100,
+        'offsets'          => [],// offset by peer partitions on the brokers
+        'key'              => '',
+        'specifyPartition' => -1,
+        '$autoCommit'    => true,
     ];
 
     /**
@@ -116,34 +122,6 @@ class ConsumerConfig extends Config
     }
 
     /**
-     * @return array
-     * @throws Exception\Config
-     */
-    public function getTopics(): array
-    {
-        $topics = $this->ietTopics();
-
-        if (empty($topics)) {
-            throw new Exception\Config('Get consumer topics value is invalid, must set it not empty');
-        }
-
-        return $topics;
-    }
-
-    /**
-     * @param array $topics
-     * @throws Exception\Config
-     */
-    public function setTopics(array $topics): void
-    {
-        if (empty($topics)) {
-            throw new Exception\Config('Set consumer topics value is invalid, must set it not empty array');
-        }
-
-        static::$options['topics'] = $topics;
-    }
-
-    /**
      * @param int $mode
      * @throws Exception\Config
      */
@@ -165,5 +143,57 @@ class ConsumerConfig extends Config
     public function getConsumeMode(): int
     {
         return $this->runtimeOptions['consume_mode'];
+    }
+
+    /**
+     * @param array $offsets
+     * @throws Exception\Config
+     */
+    public function setOffsets(array $offsets): void
+    {
+        if (empty($offsets)) {
+            throw new Exception\Config('Set consumer offsets value is invalid, must set it not empty array');
+        }
+
+        static::$options['offsets'] = $offsets;
+    }
+
+    /**
+     * @param string $key
+     * @throws Exception\Config
+     */
+    public function setKey(string $key): void
+    {
+        if (empty($key)) {
+            throw new Exception\Config('Set consumer key value is invalid, must set it not empty string');
+        }
+
+        static::$options['key'] = $key;
+    }
+
+    /**
+     * @param int $specifyPartition
+     * @throws Exception\Config
+     */
+    public function setSpecifyPartition(int $specifyPartition): void
+    {
+        if (empty($specifyPartition)) {
+            throw new Exception\Config('Set consumer $specifyPartition value is invalid, must set it 0 ... max partition');
+        }
+
+        static::$options['specifyPartition'] = $specifyPartition;
+    }
+
+    /**
+     * @param bool $isAuto
+     * @throws Exception\Config
+     */
+    public function setAutoCommit(bool $isAuto)
+    {
+        if (in_array(strtolower($isAuto), [true, false], true)) {
+            throw new Exception\Config('Set consumer isAutoCommit value is invalid, must set TRUE or FALSE');
+        }
+
+        static::$options['autoCommit'] = $isAuto;
     }
 }

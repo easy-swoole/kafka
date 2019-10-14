@@ -2,8 +2,8 @@
 /**
  * Created by PhpStorm.
  * User: Manlin
- * Date: 2019/9/19
- * Time: 上午10:30
+ * Date: 2019/9/24
+ * Time: 下午5:35
  */
 namespace EasySwoole\Kafka\Config;
 
@@ -11,21 +11,16 @@ use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Exception;
 
 /**
- * Class OffsetConfig
- * @method string getGroupId
+ * Class HeartBeatConfig
+ * @method string getGroupId()
  * @package EasySwoole\Kafka\Config
  */
-class OffsetConfig extends Config
+class HeartBeatConfig extends Config
 {
     use Singleton;
 
     protected static $defaults = [
         'groupId'          => '',
-        'sessionTimeout'   => 30000,
-        'rebalanceTimeout' => 30000,
-        'offsetReset'      => 'latest', // earliest
-        'maxBytes'         => 65536, // 64kb
-        'maxWaitTime'      => 100,
     ];
 
     /**

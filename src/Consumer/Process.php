@@ -8,21 +8,11 @@
 namespace EasySwoole\Kafka\Consumer;
 
 use EasySwoole\Kafka\BaseProcess;
-use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
-use EasySwoole\Kafka\Protocol\Protocol as ProtocolTool;
+use EasySwoole\Kafka;
 use EasySwoole\Log\Logger;
-use function count;
-use function end;
-use function explode;
-use function in_array;
-use function json_encode;
-use function shuffle;
-use function sprintf;
-use function substr;
-use function trim;
 
 class Process extends BaseProcess
 {
@@ -36,348 +26,112 @@ class Process extends BaseProcess
      */
     protected $messages = [];
 
-    /**
-     * @var State
-     */
-    private $state;
+    protected $topics;
+
+    protected $brokers;
 
     public function __construct(?callable $consumer = null)
     {
-        $this->consumer = $consumer;
-
         parent::__construct();
-    }
 
-    public function init(): void
-    {
-        $config = $this->getConfig();
-        Protocol::init($config->getBrokerVersion());
+        $this->config = $this->getConfig();
+        Protocol::init($this->config->getBrokerVersion());
+        $this->getBroker()->setConfig($this->config);
 
-        $broker = $this->getBroker();
-        $broker->setConfig($config);
-        $broker->setProcess(function (string $data, int $fd): void {
-            $this->processRequest($data, $fd);
-        });
-
-        $this->state = State::getInstance();
-
-        $this->state->setCallback(
-            [
-                State::REQUEST_METADATA      => function (): void {
-                    $this->syncMeta();
-                },
-                State::REQUEST_GETGROUP      => function (): void {
-                    $this->getGroupBrokerId();
-                },
-                State::REQUEST_JOINGROUP     => function (): void {
-                    $this->joinGroup();
-                },
-                State::REQUEST_SYNCGROUP     => function (): void {
-                    $this->syncGroup();
-                },
-                State::REQUEST_HEARTGROUP    => function (): void {
-                    $this->heartbeat();
-                },
-                State::REQUEST_OFFSET        => function (): array {
-                    return $this->offset();
-                },
-                State::REQUEST_FETCH_OFFSET  => function (): void {
-                    $this->fetchOffset();
-                },
-                State::REQUEST_FETCH         => function (): array {
-                    return $this->fetch();
-                },
-                State::REQUEST_COMMIT_OFFSET => function (): void {
-                    $this->commit();
-                },
-            ]
-        );
-        $this->state->init();
-    }
-
-    public function start(): void
-    {
-        $this->init();
-        $this->state->start();
-    }
-
-    public function stop(): void
-    {
-        // TODO: we should remove the consumer from the group here
-
-        $this->state->stop();
+        $this->consumer = $consumer;
     }
 
     /**
-     * @param string $data
-     * @param int    $fd
-     * @throws Exception\Exception
-     */
-    protected function processRequest(string $data, int $fd): void
-    {
-        $correlationId = ProtocolTool::unpack(ProtocolTool::BIT_B32, substr($data, 0, 4));
-
-        switch ($correlationId) {
-            case Protocol::METADATA_REQUEST:
-                $result = Protocol::decode(Protocol::METADATA_REQUEST, substr($data, 4));
-
-                if (! isset($result['brokers'], $result['topics'])) {
-                    $this->logger->log('Get metadata is fail, brokers or topics is null.', Logger::LOG_LEVEL_ERROR);
-                    $this->state->failRun(State::REQUEST_METADATA);
-                    break;
-                }
-
-                /** @var Broker $broker */
-                $broker   = $this->getBroker();
-                $isChange = $broker->setData($result['topics'], $result['brokers']);
-                $this->state->succRun(State::REQUEST_METADATA, $isChange);
-
-                break;
-            case Protocol::GROUP_COORDINATOR_REQUEST:
-                $result = Protocol::decode(Protocol::GROUP_COORDINATOR_REQUEST, substr($data, 4));
-
-                if (! isset($result['errorCode'], $result['coordinatorId'])
-                    || $result['errorCode'] !== Protocol::NO_ERROR) {
-                    $this->state->failRun(State::REQUEST_GETGROUP);
-                    break;
-                }
-
-                /** @var Broker $broker */
-                $broker = $this->getBroker();
-                $broker->setGroupBrokerId($result['coordinatorId']);
-
-                $this->state->succRun(State::REQUEST_GETGROUP);
-
-                break;
-            case Protocol::JOIN_GROUP_REQUEST:
-                $result = Protocol::decode(Protocol::JOIN_GROUP_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->succJoinGroup($result);
-                    break;
-                }
-
-                $this->failJoinGroup($result['errorCode']);
-                break;
-            case Protocol::SYNC_GROUP_REQUEST:
-                $result = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->succSyncGroup($result);
-                    break;
-                }
-
-                $this->failSyncGroup($result['errorCode']);
-                break;
-            case Protocol::HEART_BEAT_REQUEST:
-                $result = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 4));
-                if (isset($result['errorCode']) && $result['errorCode'] === Protocol::NO_ERROR) {
-                    $this->state->succRun(State::REQUEST_HEARTGROUP);
-                    break;
-                }
-
-                $this->failHeartbeat($result['errorCode']);
-                break;
-            case Protocol::OFFSET_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 4));
-                $this->succOffset($result, $fd);
-                break;
-            case ProtocolTool::OFFSET_FETCH_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_FETCH_REQUEST, substr($data, 4));
-                $this->succFetchOffset($result);
-                break;
-            case ProtocolTool::FETCH_REQUEST:
-                $result = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 4));
-                $this->succFetch($result, $fd);
-                break;
-            case ProtocolTool::OFFSET_COMMIT_REQUEST:
-                $result = Protocol::decode(Protocol::OFFSET_COMMIT_REQUEST, substr($data, 4));
-                $this->succCommit($result);
-                break;
-            default:
-                $this->logger->log('Error request, correlationId:' . $correlationId, Logger::LOG_LEVEL_ERROR);
-        }
-    }
-
-    /**
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function syncMeta(): void
+    public function subscribe()
     {
-        $this->logger->console('Start sync metadata request');
+        if ($this->syncMeta() === false
+            || $this->getGroupBrokerId() === false
+            || $this->joinGroup() === false
+            || $this->syncGroup() === false
+        ) {
+            return false;
+        }
 
-        $config = $this->getConfig();
+        while (1) {
+            if ($this->heartbeat() === false) {
+                break;
+            }
+            $this->getListOffset();
 
-        $brokerList = $config->getMetadataBrokerList();
-        $brokerHost = [];
+            $this->fetchOffset();
 
-        foreach (explode(',', $brokerList) as $key => $val) {
-            if (trim($val)) {
-                $brokerHost[] = $val;
+            $this->fetchMsg();
+
+            // 自动提交或者用户手动提交
+            if ($this->getConfig()->getAutoCommit() === true) {
+                if ($this->commit() === false) {
+                    break;
+                }
             }
         }
-
-        if (count($brokerHost) === 0) {
-            throw new Exception\Exception('No valid broker configured');
-        }
-
-        shuffle($brokerHost);
-        $broker = $this->getBroker();
-
-        foreach ($brokerHost as $host) {
-            $socket = $broker->getMetaConnect($host);
-
-            if ($socket === null) {
-                continue;
-            }
-
-            $params = $config->getTopics();
-            $this->logger->log('Start sync metadata request params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-            $requestData = Protocol::encode(Protocol::METADATA_REQUEST, $params);
-
-            $socket->send($requestData);
-
-            return;
-        }
-
-        throw Exception\ConnectionException::fromBrokerList($brokerList);
     }
 
     /**
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function getGroupBrokerId(): void
+    public function getGroupBrokerId()
     {
-        $broker  = $this->getBroker();
-        $connect = $broker->getRandConnect();
+        $results = Kafka\Group\Process::getInstance()->getGroupBrokerId();
 
-        if ($connect === null) {
-            return;
+        if (! isset($results['errorCode'], $results['nodeId'])
+            || $results['errorCode'] !== Protocol::NO_ERROR
+        ) {
+            $this->stateConvert($results['errorCode']);
         }
 
-        $config = $this->getConfig();
-        $params = ['group_id' => $config->getGroupId()];
-
-        $requestData = Protocol::encode(Protocol::GROUP_COORDINATOR_REQUEST, $params);
-        $connect->send($requestData);
+        $this->getBroker()->setGroupBrokerId($results['nodeId']);
     }
 
     /**
-     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function joinGroup(): void
+    public function joinGroup()
     {
-        $broker = $this->getBroker();
-
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
-
-        if ($connect === null) {
-            return;
+        $result = Kafka\Group\Process::getInstance()->joinGroup();
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log(
+                sprintf(
+                    'Join group fail, need rejoin, errorCode %d, memberId: %s',
+                    $result['errorCode'],
+                    $this->getAssignment()->getMemberId()
+                ),
+                Logger::LOG_LEVEL_ERROR
+            );
+            $this->stateConvert($result['errorCode']);
+            return false;
         }
 
-        $topics   = $this->getConfig()->getTopics();
-        $assign   = $this->getAssignment();
-        $memberId = $assign->getMemberId();
-
-        $params = [
-            'group_id'          => $this->getConfig()->getGroupId(),
-            'session_timeout'   => $this->getConfig()->getSessionTimeout(),
-            'rebalance_timeout' => $this->getConfig()->getRebalanceTimeout(),
-            'member_id'         => $memberId ?? '',
-            'data'              => [
-                [
-                    'protocol_name' => 'range',
-                    'version'       => 0,
-                    'subscription'  => $topics,
-                    'user_data'     => '',
-                ],
-            ],
-        ];
-
-        $requestData = Protocol::encode(Protocol::JOIN_GROUP_REQUEST, $params);
-        $connect->send($requestData);
-        $this->logger->log('Join group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
+        $this->getAssignment()->setMemberId($result['memberId']);
+        $this->getAssignment()->setGenerationId($result['generationId']);
+        $this->getAssignment()->assign($result['members']);
     }
 
     /**
-     * @param int $errorCode
-     */
-    public function failJoinGroup(int $errorCode): void
-    {
-        $assign   = $this->getAssignment();
-        $memberId = $assign->getMemberId();
-
-        $this->logger->log(sprintf('Join group fail, need rejoin, errorCode %d, memberId: %s', $errorCode, $memberId),
-            Logger::LOG_LEVEL_ERROR
-        );
-        $this->stateConvert($errorCode);
-    }
-
-    /**
-     * @param mixed[] $result
-     */
-    public function succJoinGroup(array $result): void
-    {
-        $this->state->succRun(State::REQUEST_JOINGROUP);
-        $assign = $this->getAssignment();
-        $assign->setMemberId($result['memberId']);
-        $assign->setGenerationId($result['generationId']);
-
-        if ($result['leaderId'] === $result['memberId']) { // leader assign partition
-            $assign->assign($result['members']);
-        }
-
-        $this->logger->log(sprintf('Join group sucess, params: %s', json_encode($result)), Logger::LOG_LEVEL_INFO);
-    }
-
-    /**
-     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function syncGroup(): void
+    public function syncGroup()
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
-
-        if ($connect === null) {
-            return;
+        $result = Kafka\Group\Process::getInstance()->syncGroup();
+        $this->logger->log(sprintf('Sync group sucess, params: %s', json_encode($result)));
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log(
+                sprintf('Sync group fail, need rejoin, errorCode %d', $result['errorCode']),
+                Logger::LOG_LEVEL_ERROR
+            );
+            $this->stateConvert($result['errorCode']);
+            return false;
         }
-
-        $assign       = $this->getAssignment();
-        $memberId     = $assign->getMemberId();
-        $generationId = $assign->getGenerationId();
-
-        $params = [
-            'group_id'      => $this->getConfig()->getGroupId(),
-            'generation_id' => $generationId ?? null,
-            'member_id'     => $memberId,
-            'data'          => $assign->getAssignments(),
-        ];
-
-        $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
-        $this->logger->log('Sync group start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-
-        $connect->send($requestData);
-    }
-
-    public function failSyncGroup(int $errorCode): void
-    {
-        $this->logger->log(sprintf('Sync group fail, need rejoin, errorCode %d', $errorCode), Logger::LOG_LEVEL_ERROR);
-        $this->stateConvert($errorCode);
-    }
-
-    /**
-     * @param mixed[][] $result
-     */
-    public function succSyncGroup(array $result): void
-    {
-        $this->logger->log(sprintf('Sync group sucess, params: %s', json_encode($result)), Logger::LOG_LEVEL_INFO);
-        $this->state->succRun(State::REQUEST_SYNCGROUP);
 
         $topics = $this->getBroker()->getTopics();
 
@@ -399,199 +153,78 @@ class Process extends BaseProcess
                 $brokerToTopics[$brokerId][$topic['topicName']] = $topicInfo;
             }
         }
-
         $assign = $this->getAssignment();
         $assign->setTopics($brokerToTopics);
     }
 
     /**
-     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function heartbeat(): void
+    public function getListOffset()
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
+        // 获取分区的offset列表
+        $results        = Kafka\Offset\Process::getInstance()->listOffset();
+        $offsets        = $this->getAssignment()->getOffsets();
+        $lastOffsets    = $this->getAssignment()->getLastOffsets();
 
-        if ($connect === null) {
-            return;
-        }
-
-        $assign   = $this->getAssignment();
-        $memberId = $assign->getMemberId();
-
-        if (trim($memberId) === '') {
-            return;
-        }
-
-        $generationId = $assign->getGenerationId();
-
-        $params = [
-            'group_id'      => $this->getConfig()->getGroupId(),
-            'generation_id' => $generationId,
-            'member_id'     => $memberId,
-        ];
-
-        $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
-        $connect->send($requestData);
-    }
-
-    public function failHeartbeat(int $errorCode): void
-    {
-        $this->logger->log('Heartbeat error, errorCode:' . $errorCode, Logger::LOG_LEVEL_ERROR);
-        $this->stateConvert($errorCode);
-    }
-
-    /**
-     * @return array
-     * @throws Exception\Exception
-     */
-    protected function offset(): array
-    {
-        $context = [];
-        $broker  = $this->getBroker();
-        $topics  = $this->getAssignment()->getTopics();
-
-        foreach ($topics as $brokerId => $topicList) {
-            $connect = $broker->getMetaConnect((string) $brokerId);
-
-            if ($connect === null) {
-                return [];
-            }
-
-            $data = [];
-            foreach ($topicList as $topic) {
-                $item = [
-                    'topic_name' => $topic['topic_name'],
-                    'partitions' => [],
-                ];
-
-                foreach ($topic['partitions'] as $partId) {
-                    $item['partitions'][] = [
-                        'partition_id' => $partId,
-                        'offset' => 1,
-                        'time' =>  -1,
-                    ];
-                    $data[]               = $item;
-                }
-            }
-
-            $params = [
-                'replica_id' => -1,
-                'data'       => $data,
-            ];
-
-//            $stream      = $connect->send();
-            $requestData = Protocol::encode(Protocol::OFFSET_REQUEST, $params);
-
-            $connect->send($requestData);
-            // todo stream返回值
-//            $context[] = (int) $stream;
-        }
-
-        return $context;
-    }
-
-    /**
-     * @param mixed[][] $result
-     */
-    public function succOffset(array $result, int $fd): void
-    {
-        $offsets     = $this->getAssignment()->getOffsets();
-        $lastOffsets = $this->getAssignment()->getLastOffsets();
-
-        foreach ($result as $topic) {
+        foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     $this->stateConvert($part['errorCode']);
-                    break 2;
+                    continue;
                 }
 
-                $offsets[$topic['topicName']][$part['partition']]     = end($part['offsets']);
-                $lastOffsets[$topic['topicName']][$part['partition']] = $part['offsets'][0];
+                $offsets[$topic['topicName']][$part['partition']]       = end($part['offsets']);
+                $lastOffsets[$topic['topicName']][$part['partition']]   = $part['offsets'][0];
             }
         }
 
         $this->getAssignment()->setOffsets($offsets);
         $this->getAssignment()->setLastOffsets($lastOffsets);
-        $this->state->succRun(State::REQUEST_OFFSET, $fd);
     }
 
     /**
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function fetchOffset(): void
+    public function heartbeat()
     {
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
-
-        if ($connect === null) {
-            return;
+        $result = Kafka\Heartbeat\Process::getInstance()->heartbeat();
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log('Heartbeat error, errorCode:' . $result['errorCode']);
+            $this->stateConvert($result['errorCode']);
+            return false;
         }
-
-        $topics = $this->getAssignment()->getTopics();
-        $data   = [];
-
-        foreach ($topics as $brokerId => $topicList) {
-            foreach ($topicList as $topic) {
-                $partitions = [];
-
-                if (isset($data[$topic['topic_name']]['partitions'])) {
-                    $partitions = $data[$topic['topic_name']]['partitions'];
-                }
-
-                foreach ($topic['partitions'] as $partId) {
-                    $partitions[] = $partId;
-                }
-
-                $data[$topic['topic_name']]['partitions'] = $partitions;
-                $data[$topic['topic_name']]['topic_name'] = $topic['topic_name'];
-            }
-        }
-
-        $params = [
-            'group_id' => $this->getConfig()->getGroupId(),
-            'data'     => $data,
-        ];
-
-        $requestData = Protocol::encode(Protocol::OFFSET_FETCH_REQUEST, $params);
-        $connect->send($requestData);
     }
 
     /**
-     * @param mixed[] $result
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
      */
-    public function succFetchOffset(array $result): void
+    public function fetchOffset()
     {
-        $msg = sprintf('Get current fetch offset sucess, result: %s', json_encode($result));
-        $this->logger->log($msg, Logger::LOG_LEVEL_INFO);
+        $result = Kafka\Offset\Process::getInstance()->fetchOffset();
 
-        $assign  = $this->getAssignment();
-        $offsets = $assign->getFetchOffsets();
-
+        $offsets = $this->getAssignment()->getFetchOffsets();
         foreach ($result as $topic) {
             foreach ($topic['partitions'] as $part) {
-                if ($part['errorCode'] !== 0) {
+                if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     $this->stateConvert($part['errorCode']);
-                    break 2;
+                    continue;
                 }
 
                 $offsets[$topic['topicName']][$part['partition']] = $part['offset'];
             }
         }
 
-        $assign->setFetchOffsets($offsets);
+        $this->getAssignment()->setFetchOffsets($offsets);
 
-        $consumerOffsets = $assign->getConsumerOffsets();
-        $lastOffsets     = $assign->getLastOffsets();
+        $consumerOffsets    = $this->getAssignment()->getConsumerOffsets();
+        $lastOffsets        = $this->getAssignment()->getLastOffsets();
 
         if (empty($consumerOffsets)) {
-            $consumerOffsets = $assign->getFetchOffsets();
-
+            $consumerOffsets = $this->getAssignment()->getFetchOffsets();
             foreach ($consumerOffsets as $topic => $value) {
                 foreach ($value as $partId => $offset) {
                     if (isset($lastOffsets[$topic][$partId]) && $lastOffsets[$topic][$partId] > $offset) {
@@ -600,212 +233,80 @@ class Process extends BaseProcess
                 }
             }
 
-            $assign->setConsumerOffsets($consumerOffsets);
-            $assign->setCommitOffsets($assign->getFetchOffsets());
+            $this->getAssignment()->setConsumerOffsets($consumerOffsets);
+            $this->getAssignment()->setCommitOffsets($this->getAssignment()->getFetchOffsets());
         }
-
-        $this->state->succRun(State::REQUEST_FETCH_OFFSET);
     }
 
     /**
      * @return array
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function fetch(): array
+    public function fetchMsg()
     {
-        $this->messages  = [];
-        $context         = [];
-        $broker          = $this->getBroker();
-        $topics          = $this->getAssignment()->getTopics();
-        $consumerOffsets = $this->getAssignment()->getConsumerOffsets();
+        $results = Kafka\Fetch\Process::getInstance()->fetch($this->getAssignment()->getConsumerOffsets());
+        $this->logger->log('Fetch success, result:' . json_encode($results));
 
-        foreach ($topics as $brokerId => $topicList) {
-            $connect = $broker->getDataConnect((string) $brokerId);
-
-            if ($connect === null) {
-                return [];
-            }
-
-            $data = [];
-
-            foreach ($topicList as $topic) {
-                $item = [
-                    'topic_name' => $topic['topic_name'],
-                    'partitions' => [],
-                ];
-
-                foreach ($topic['partitions'] as $partId) {
-                    $item['partitions'][] = [
-                        'partition_id' => $partId,
-                        'offset' => isset($consumerOffsets[$topic['topic_name']][$partId]) ? $consumerOffsets[$topic['topic_name']][$partId] : 0,
-                        'max_bytes' => $this->getConfig()->getMaxBytes(),
-                    ];
-                }
-
-                $data[] = $item;
-            }
-
-            $params = [
-                'max_wait_time' => $this->getConfig()->getMaxWaitTime(),
-                'replica_id' => -1,
-                'min_bytes' => '1000',
-                'data' => $data,
-            ];
-
-            $this->logger->log('Fetch message start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-            $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
-            $connect->send($requestData);
-//            $context[] = (int) $connect->getSocket();
-        }
-
-        return $context;
-    }
-
-    /**
-     * @param mixed[][][] $result
-     */
-    public function succFetch(array $result, int $fd): void
-    {
-        $assign = $this->getAssignment();
-        $this->logger->log('Fetch success, result:' . json_encode($result), Logger::LOG_LEVEL_INFO);
-
-        foreach ($result['topics'] as $topic) {
+        foreach ($results['topics'] as $topic) {
             foreach ($topic['partitions'] as $part) {
-                $context = [
-                    $topic['topicName'],
-                    $part['partition'],
-                ];
-
                 if ($part['errorCode'] !== 0) {
-                    $this->stateConvert($part['errorCode'], $context);
+                    $this->stateConvert($part['errorCode'], [
+                        $topic['topicName'],
+                        $part['partition']
+                    ]);
                     continue;
                 }
 
-                $offset = $assign->getConsumerOffset($topic['topicName'], $part['partition']);
+                $offset = $this->getAssignment()->getConsumerOffset($topic['topicName'], $part['partition']);
 
                 if ($offset === null) {
-                    return; // current is rejoin....
+                    return [];
                 }
 
                 foreach ($part['messages'] as $message) {
                     $this->messages[$topic['topicName']][$part['partition']][] = $message;
-
-                    $offset = $message['offset'];
+                    $offset = $message['offset'];// 当前消息的偏移量
                 }
 
                 $consumerOffset = ($part['highwaterMarkOffset'] > $offset) ? ($offset + 1) : $offset;
-                $assign->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
-                $assign->setCommitOffset($topic['topicName'], $part['partition'], $offset);
+                $this->getAssignment()->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
+                $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
             }
         }
-
-        $this->state->succRun(State::REQUEST_FETCH, $fd);
-    }
-
-    protected function consumeMessage(): void
-    {
-        foreach ($this->messages as $topic => $value) {
-            foreach ($value as $partition => $messages) {
-                foreach ($messages as $message) {
-                    if ($this->consumer !== null) {
-                        ($this->consumer)($topic, $partition, $message);
-                    }
-                }
-            }
-        }
-
-        $this->messages = [];
     }
 
     /**
-     * @throws Exception\Config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    protected function commit(): void
+    public function commit()
     {
-        $config = $this->getConfig();
-
-        if ($config->getConsumeMode() === ConsumerConfig::CONSUME_BEFORE_COMMIT_OFFSET) {
+        // 先消费，再提交
+        if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_BEFORE_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
+        $results = Kafka\Offset\Process::getInstance()->commit($this->getAssignment()->getCommitOffsets());
+        $this->logger->log('Commit success, result:' . json_encode($results));
 
-        $broker        = $this->getBroker();
-        $groupBrokerId = $broker->getGroupBrokerId();
-        $connect       = $broker->getMetaConnect((string) $groupBrokerId);
-
-        if ($connect === null) {
-            return;
-        }
-
-        $commitOffsets = $this->getAssignment()->getCommitOffsets();
-        $topics        = $this->getAssignment()->getTopics();
-        $this->getAssignment()->setPreCommitOffsets($commitOffsets);
-        $data = [];
-
-        foreach ($topics as $brokerId => $topicList) {
-            foreach ($topicList as $topic) {
-                $partitions = [];
-
-                if (isset($data[$topic['topic_name']]['partitions'])) {
-                    $partitions = $data[$topic['topic_name']]['partitions'];
-                }
-
-                foreach ($topic['partitions'] as $partId) {
-                    if ($commitOffsets[$topic['topic_name']][$partId] === -1) {
-                        continue;
-                    }
-
-                    $partitions[$partId]['partition'] = $partId;
-                    $partitions[$partId]['offset']    = $commitOffsets[$topic['topic_name']][$partId];
-                }
-
-                $data[$topic['topic_name']]['partitions'] = $partitions;
-                $data[$topic['topic_name']]['topic_name'] = $topic['topic_name'];
-            }
-        }
-
-        $params = [
-            'group_id' => $this->getConfig()->getGroupId(),
-            'generation_id' => $this->getAssignment()->getGenerationId(),
-            'member_id' => $this->getAssignment()->getMemberId(),
-            'data' => $data,
-        ];
-
-        $this->logger->log('Commit current fetch offset start, params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
-        $requestData = Protocol::encode(Protocol::OFFSET_COMMIT_REQUEST, $params);
-        $connect->send($requestData);
-    }
-
-    /**
-     * @param mixed[][] $result
-     */
-    public function succCommit(array $result): void
-    {
-        $this->logger->log('Commit success, result:' . json_encode($result), Logger::LOG_LEVEL_INFO);
-        $this->state->succRun(State::REQUEST_COMMIT_OFFSET);
-
-        foreach ($result as $topic) {
+        foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
-                if ($part['errorCode'] !== 0) {
+                if ($part['errorCode'] !== Protocol::NO_ERROR) {
                     $this->stateConvert($part['errorCode']);
-                    return;  // not call user consumer function
+                    return false;
                 }
             }
         }
 
+        // 先提交，再消费。默认此项
         if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_AFTER_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
     }
 
-    /**
-     * @param int        $errorCode
-     * @param array|null $context
-     * @return bool
-     */
     protected function stateConvert(int $errorCode, ?array $context = null): bool
     {
-        $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_INFO);
+        $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_ERROR);
 
         $recoverCodes = [
             Protocol::UNKNOWN_TOPIC_OR_PARTITION,
@@ -826,48 +327,65 @@ class Process extends BaseProcess
             Protocol::UNKNOWN_MEMBER_ID,
         ];
 
-        $assign = $this->getAssignment();
-
         if (in_array($errorCode, $recoverCodes, true)) {
-            $this->state->recover();
-            $assign->clearOffset();
+            $this->getAssignment()->clearOffset();
             return false;
         }
 
         if (in_array($errorCode, $rejoinCodes, true)) {
             if ($errorCode === Protocol::UNKNOWN_MEMBER_ID) {
-                $assign->setMemberId('');
+                $this->getAssignment()->setMemberId('');
+                return false;
             }
 
-            $assign->clearOffset();
-            $this->state->rejoin();
+            $this->getAssignment()->clearOffset();
             return false;
         }
 
         if ($errorCode === Protocol::OFFSET_OUT_OF_RANGE) {
             $resetOffset      = $this->getConfig()->getOffsetReset();
-            $offsets          = $resetOffset === 'latest' ? $assign->getLastOffsets() : $assign->getOffsets();
+            $offsets          = $resetOffset === 'latest' ?
+                $this->getAssignment()->getLastOffsets() : $this->getAssignment()->getOffsets();
 
             [$topic, $partId] = $context;
 
             if (isset($offsets[$topic][$partId])) {
-                $assign->setConsumerOffset($topic, (int) $partId, $offsets[$topic][$partId]);
+                $this->getAssignment()->setConsumerOffset($topic, (int) $partId, $offsets[$topic][$partId]);
             }
         }
 
         return true;
     }
 
-    private function getBroker(): Broker
+    /**
+     * 消费消息
+     */
+    private function consumeMessage(): void
     {
-        return Broker::getInstance();
+        foreach ($this->messages as $topic => $value) {
+            foreach ($value as $partition => $messages) {
+                foreach ($messages as $message) {
+                    if ($this->consumer !== null) {
+                        ($this->consumer)($topic, $partition, $message);
+                    }
+                }
+            }
+        }
+
+        $this->messages = [];
     }
 
-    private function getConfig(): ConsumerConfig
+    /**
+     * @return ConsumerConfig
+     */
+    protected function getConfig(): ConsumerConfig
     {
         return ConsumerConfig::getInstance();
     }
 
+    /**
+     * @return Assignment
+     */
     private function getAssignment(): Assignment
     {
         return Assignment::getInstance();

@@ -2,14 +2,15 @@
 /**
  * Created by PhpStorm.
  * User: Manlin
- * Date: 2019/9/21
- * Time: 下午11:18
+ * Date: 2019/9/24
+ * Time: 下午3:48
  */
 require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Group;
 use EasySwoole\Kafka\Config\GroupConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 
 go(function () {
     $config = new GroupConfig();
@@ -18,8 +19,12 @@ go(function () {
 
     $config->setGroupId('test');
 
-    $group = new Group();
+    $assign = Assignment::getInstance();
+    $assign->setGenerationId(1);
+    $assign->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
 
-    $result = $group->joinGroup();
+    $offset = new Group();
+
+    $result = $offset->syncGroup();
     var_dump($result);
 });

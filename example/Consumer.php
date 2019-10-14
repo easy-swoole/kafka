@@ -18,12 +18,17 @@ go(function () {
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setGroupId('test');
     $config->setBrokerVersion('1.0.0');
+
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
-    $consumer = new Consumer();
+    $config->setAutoCommit(true);// default true
 
-    $consumer->start(function ($topic, $part, $message): void {
-        var_dump($message);
+    $consumer = new Consumer(function ($topic, $partition, $message) {
+//        var_dump($topic);
+//        var_dump($partition);
+//        var_dump($message);
     });
+
+    $consumer->subscribe();
 });

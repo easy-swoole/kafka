@@ -9,7 +9,6 @@ namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\Consumer\Process;
 use EasySwoole\Kafka\Consumer\StopStrategy;
-use EasySwoole\Log\Logger;
 
 class Consumer
 {
@@ -24,51 +23,22 @@ class Consumer
      */
     private $process;
 
-    private $logger;
-
-    public function __construct(?StopStrategy $stopStrategy = null)
+    /**
+     * Consumer constructor.
+     * @param callable $func
+     * @throws Exception\Exception
+     */
+    public function __construct(callable $func)
     {
-        $this->stopStrategy = $stopStrategy;
-        $this->logger = new Logger();
+        $this->process = new Process($func);
     }
 
     /**
-     * @param callable|null $consumer
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
      */
-    public function start(?callable $consumer = null): void
+    public function subscribe()
     {
-        if ($this->process !== null) {
-            $this->logger->log('Consumer is already being executed', Logger::LOG_LEVEL_ERROR);
-            return;
-        }
-
-        $this->setupStopStrategy();
-
-        $this->process = new Process($consumer);
-        $this->process->start();
-
-        Loop::run();
-    }
-
-    private function setupStopStrategy(): void
-    {
-        if ($this->stopStrategy === null) {
-            return;
-        }
-
-        $this->stopStrategy->setup($this);
-    }
-
-    public function stop(): void
-    {
-        if ($this->process === null) {
-            $this->logger->log('Consumer is not running', Logger::LOG_LEVEL_ERROR);
-            return;
-        }
-
-        $this->process->stop();
-        $this->process = null;
-
-        Loop::stop();
+        $this->process->subscribe();
     }
 }

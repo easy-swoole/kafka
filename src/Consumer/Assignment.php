@@ -36,26 +36,31 @@ class Assignment
     private $topics = [];
 
     /**
+     * 初始偏移量
      * @var int[][]
      */
     private $offsets = [];
 
     /**
+     * 分区中可支持的最大的偏移量
      * @var int[][]
      */
     private $lastOffsets = [];
 
     /**
+     * fetchOffset返回的对应偏移量
      * @var int[][]
      */
     private $fetchOffsets = [];
 
     /**
+     * 当前消费偏移量
      * @var int[][]
      */
     private $consumerOffsets = [];
 
     /**
+     * 当前提交偏移量
      * @var int[][]
      */
     private $commitOffsets = [];
@@ -94,6 +99,14 @@ class Assignment
     }
 
     /**
+     * @param array $assignments
+     */
+    public function setAssignments(array $assignments): void
+    {
+        $this->assignments = $assignments;
+    }
+
+    /**
      * @param string[] $result
      */
     public function assign(array $result): void
@@ -107,8 +120,8 @@ class Assignment
         $count   = 0;
         $members = [];
 
-        foreach ($topics as $topicName => $partitionition) {
-            foreach ($partitionition as $partitionId => $leaderId) {
+        foreach ($topics as $topicName => $partition) {
+            foreach ($partition as $partitionId => $leaderId) {
                 $memberNum = $count % $memberCount;
 
                 if (! isset($members[$memberNum])) {

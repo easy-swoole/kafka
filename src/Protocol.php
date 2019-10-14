@@ -245,7 +245,7 @@ class Protocol
             Protocol\Protocol::SYNC_GROUP_REQUEST        => Protocol\SyncGroup::class,
             Protocol\Protocol::DESCRIBE_GROUPS_REQUEST   => Protocol\DescribeGroups::class,
             Protocol\Protocol::LIST_GROUPS_REQUEST       => Protocol\ListGroup::class,
-            //Protocol\Protocol::SASL_HAND_SHAKE_REQUEST   => Protocol\SaslHandShake::class,
+            Protocol\Protocol::SASL_HAND_SHAKE_REQUEST   => Protocol\SaslHandShake::class,
             Protocol\Protocol::API_VERSIONS_REQUEST      => Protocol\ApiVersions::class,
         ];
 

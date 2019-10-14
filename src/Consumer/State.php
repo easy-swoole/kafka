@@ -8,8 +8,8 @@
 namespace EasySwoole\Kafka\Consumer;
 
 use EasySwoole\Component\Singleton;
-use EasySwoole\Kafka\ConsumerConfig;
 use function array_keys;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 use function microtime;
 
 class State
@@ -91,16 +91,20 @@ class State
 
             $interval = $option['interval'] ?? 200;
 
-            Loop::repeat(
-                (int) $interval,
-                function (string $watcherId) use ($request, $option): void {
-                    if ($this->checkRun($request) && $option['func'] !== null) {
-                        $this->processing($request, $option['func']());
-                    }
+            if ($this->checkRun($request) && $option['func'] !== null) {
+                $this->processing($request, $option['func']());
+            }
 
-                    $this->requests[$request]['watcher'] = $watcherId;
-                }
-            );
+//            Loop::repeat(
+//                (int) $interval,
+//                function (string $watcherId) use ($request, $option): void {
+//                    if ($this->checkRun($request) && $option['func'] !== null) {
+//                        $this->processing($request, $option['func']());
+//                    }
+//
+//                    $this->requests[$request]['watcher'] = $watcherId;
+//                }
+//            );
         }
 
         // start sync metadata
