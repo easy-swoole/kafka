@@ -8,22 +8,11 @@
 namespace EasySwoole\Kafka\Consumer;
 
 use EasySwoole\Kafka\BaseProcess;
-use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
-use EasySwoole\Kafka\Protocol\Protocol as ProtocolTool;
 use EasySwoole\Log\Logger;
-use function count;
-use function end;
-use function explode;
-use function in_array;
-use function json_encode;
-use function shuffle;
-use function sprintf;
-use function substr;
-use function trim;
 
 class Process extends BaseProcess
 {
@@ -41,8 +30,6 @@ class Process extends BaseProcess
 
     protected $brokers;
 
-    protected $isAutoCommit = true;
-
     public function __construct(?callable $consumer = null)
     {
         parent::__construct();
@@ -54,35 +41,36 @@ class Process extends BaseProcess
         $this->consumer = $consumer;
     }
 
-    public function setAutoCommit(bool $isAuto)
-    {
-        $this->isAutoCommit = $isAuto;
-    }
-
     /**
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
     public function subscribe()
     {
-        while (true) {
-            $this->syncMeta();
+        if ($this->syncMeta() === false
+            || $this->getGroupBrokerId() === false
+            || $this->joinGroup() === false
+            || $this->syncGroup() === false
+        ) {
+            return false;
+        }
 
-            $this->getGroupBrokerId();
-
-            $this->joinGroup();
-
-            $this->syncGroup();
-
+        while (1) {
+            if ($this->heartbeat() === false) {
+                break;
+            }
             $this->getListOffset();
 
             $this->fetchOffset();
 
             $this->fetchMsg();
 
-            $this->commit();
-
-            break;
+            // 自动提交或者用户手动提交
+            if ($this->getConfig()->getAutoCommit() === true) {
+                if ($this->commit() === false) {
+                    break;
+                }
+            }
         }
     }
 
@@ -97,7 +85,7 @@ class Process extends BaseProcess
         if (! isset($results['errorCode'], $results['nodeId'])
             || $results['errorCode'] !== Protocol::NO_ERROR
         ) {
-            // todo 错误处理
+            $this->stateConvert($results['errorCode']);
         }
 
         $this->getBroker()->setGroupBrokerId($results['nodeId']);
@@ -109,11 +97,23 @@ class Process extends BaseProcess
      */
     public function joinGroup()
     {
-        $ret = Kafka\Group\Process::getInstance()->joinGroup();
+        $result = Kafka\Group\Process::getInstance()->joinGroup();
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log(
+                sprintf(
+                    'Join group fail, need rejoin, errorCode %d, memberId: %s',
+                    $result['errorCode'],
+                    $this->getAssignment()->getMemberId()
+                ),
+                Logger::LOG_LEVEL_ERROR
+            );
+            $this->stateConvert($result['errorCode']);
+            return false;
+        }
 
-        $this->getAssignment()->setMemberId($ret['memberId']);
-        $this->getAssignment()->setGenerationId($ret['generationId']);
-        $this->getAssignment()->assign($ret['members']);
+        $this->getAssignment()->setMemberId($result['memberId']);
+        $this->getAssignment()->setGenerationId($result['generationId']);
+        $this->getAssignment()->assign($result['members']);
     }
 
     /**
@@ -124,6 +124,14 @@ class Process extends BaseProcess
     {
         $result = Kafka\Group\Process::getInstance()->syncGroup();
         $this->logger->log(sprintf('Sync group sucess, params: %s', json_encode($result)));
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log(
+                sprintf('Sync group fail, need rejoin, errorCode %d', $result['errorCode']),
+                Logger::LOG_LEVEL_ERROR
+            );
+            $this->stateConvert($result['errorCode']);
+            return false;
+        }
 
         $topics = $this->getBroker()->getTopics();
 
@@ -163,7 +171,8 @@ class Process extends BaseProcess
         foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
-                    // todo 错误处理
+                    $this->stateConvert($part['errorCode']);
+                    continue;
                 }
 
                 $offsets[$topic['topicName']][$part['partition']]       = end($part['offsets']);
@@ -179,6 +188,20 @@ class Process extends BaseProcess
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
+    public function heartbeat()
+    {
+        $result = Kafka\Heartbeat\Process::getInstance()->heartbeat();
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->logger->log('Heartbeat error, errorCode:' . $result['errorCode']);
+            $this->stateConvert($result['errorCode']);
+            return false;
+        }
+    }
+
+    /**
+     * @throws Exception\ConnectionException
+     * @throws Exception\Exception
+     */
     public function fetchOffset()
     {
         $result = Kafka\Offset\Process::getInstance()->fetchOffset();
@@ -187,7 +210,8 @@ class Process extends BaseProcess
         foreach ($result as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== Protocol::NO_ERROR) {
-                    // todo 错误处理
+                    $this->stateConvert($part['errorCode']);
+                    continue;
                 }
 
                 $offsets[$topic['topicName']][$part['partition']] = $part['offset'];
@@ -196,8 +220,8 @@ class Process extends BaseProcess
 
         $this->getAssignment()->setFetchOffsets($offsets);
 
-        $consumerOffsets = $this->getAssignment()->getConsumerOffsets();
-        $lastOffsets = $this->getAssignment()->getLastOffsets();
+        $consumerOffsets    = $this->getAssignment()->getConsumerOffsets();
+        $lastOffsets        = $this->getAssignment()->getLastOffsets();
 
         if (empty($consumerOffsets)) {
             $consumerOffsets = $this->getAssignment()->getFetchOffsets();
@@ -212,9 +236,6 @@ class Process extends BaseProcess
             $this->getAssignment()->setConsumerOffsets($consumerOffsets);
             $this->getAssignment()->setCommitOffsets($this->getAssignment()->getFetchOffsets());
         }
-        var_dump($offsets);
-        var_dump($lastOffsets);
-        var_dump($consumerOffsets);
     }
 
     /**
@@ -230,7 +251,10 @@ class Process extends BaseProcess
         foreach ($results['topics'] as $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== 0) {
-                    // todo 错误处理
+                    $this->stateConvert($part['errorCode'], [
+                        $topic['topicName'],
+                        $part['partition']
+                    ]);
                     continue;
                 }
 
@@ -265,7 +289,14 @@ class Process extends BaseProcess
         $results = Kafka\Offset\Process::getInstance()->commit($this->getAssignment()->getCommitOffsets());
         $this->logger->log('Commit success, result:' . json_encode($results));
 
-        // todo 错误处理
+        foreach ($results as $topic) {
+            foreach ($topic['partitions'] as $part) {
+                if ($part['errorCode'] !== Protocol::NO_ERROR) {
+                    $this->stateConvert($part['errorCode']);
+                    return false;
+                }
+            }
+        }
 
         // 先提交，再消费。默认此项
         if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_AFTER_COMMIT_OFFSET) {
@@ -277,6 +308,18 @@ class Process extends BaseProcess
     {
         $this->logger->log(Protocol::getError($errorCode), Logger::LOG_LEVEL_ERROR);
 
+        $recoverCodes = [
+            Protocol::UNKNOWN_TOPIC_OR_PARTITION,
+            Protocol::NOT_LEADER_FOR_PARTITION,
+            Protocol::BROKER_NOT_AVAILABLE,
+            Protocol::GROUP_LOAD_IN_PROGRESS,
+            Protocol::GROUP_COORDINATOR_NOT_AVAILABLE,
+            Protocol::NOT_COORDINATOR_FOR_GROUP,
+            Protocol::INVALID_TOPIC,
+            Protocol::INCONSISTENT_GROUP_PROTOCOL,
+            Protocol::INVALID_GROUP_ID,
+        ];
+
         $rejoinCodes = [
             Protocol::ILLEGAL_GENERATION,
             Protocol::INVALID_SESSION_TIMEOUT,
@@ -284,14 +327,31 @@ class Process extends BaseProcess
             Protocol::UNKNOWN_MEMBER_ID,
         ];
 
+        if (in_array($errorCode, $recoverCodes, true)) {
+            $this->getAssignment()->clearOffset();
+            return false;
+        }
+
         if (in_array($errorCode, $rejoinCodes, true)) {
             if ($errorCode === Protocol::UNKNOWN_MEMBER_ID) {
                 $this->getAssignment()->setMemberId('');
+                return false;
             }
 
             $this->getAssignment()->clearOffset();
-//            $this->state->rejoin();
             return false;
+        }
+
+        if ($errorCode === Protocol::OFFSET_OUT_OF_RANGE) {
+            $resetOffset      = $this->getConfig()->getOffsetReset();
+            $offsets          = $resetOffset === 'latest' ?
+                $this->getAssignment()->getLastOffsets() : $this->getAssignment()->getOffsets();
+
+            [$topic, $partId] = $context;
+
+            if (isset($offsets[$topic][$partId])) {
+                $this->getAssignment()->setConsumerOffset($topic, (int) $partId, $offsets[$topic][$partId]);
+            }
         }
 
         return true;

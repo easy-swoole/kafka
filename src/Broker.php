@@ -20,16 +20,9 @@ class Broker
     /**
      * @var int
      */
-    private $groupBrokerId;
+    private $groupBrokerId = 0;
 
     /**
-     * [
-     *   [
-     *     topicName:[
-     *       partitionId: leader
-     *     ]
-     *   ]
-     * ]
      * @var array
      */
     private $topics = [];

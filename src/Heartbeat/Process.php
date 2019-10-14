@@ -7,14 +7,16 @@
  */
 namespace EasySwoole\Kafka\Heartbeat;
 
+use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
-use EasySwoole\Kafka\Config\HeartBeatConfig;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Protocol;
+use EasySwoole\Log\Logger;
 
 class Process extends BaseProcess
 {
-
+    use Singleton;
     /**
      * Process constructor.
      * @throws \EasySwoole\Kafka\Exception\Exception
@@ -35,26 +37,21 @@ class Process extends BaseProcess
      */
     public function heartbeat(): array
     {
-        $result     = [];
-        foreach ($this->brokerHost as $host) {
-            $connect = $this->getBroker()->getMetaConnect($host);
-
-            if ($connect === null) {
-                continue;
-            }
-
-            $params = [
-                'group_id'      => HeartBeatConfig::getInstance()->getGroupId(),
-                'generation_id' => Assignment::getInstance()->getGenerationId(),
-                'member_id'     => Assignment::getInstance()->getMemberId(),
-            ];
-
-            $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
-            $data = $connect->send($requestData);
-            $ret = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 8));
-
-            $result[] = $ret;
+        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
+        if ($connect === null) {
+            return [];
         }
-        return $result;
+
+        $params = [
+            'group_id'      => ConsumerConfig::getInstance()->getGroupId(),
+            'generation_id' => Assignment::getInstance()->getGenerationId(),
+            'member_id'     => Assignment::getInstance()->getMemberId(),
+        ];
+
+        $this->logger->log('Heartbeat params:' . json_encode($params), Logger::LOG_LEVEL_INFO);
+        $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::HEART_BEAT_REQUEST, substr($data, 8));
+        return $ret;
     }
 }
