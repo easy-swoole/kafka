@@ -28,7 +28,7 @@ class Process extends BaseProcess
         $brokerHost = [];
         foreach (explode(',', $brokerList) as $key => $val) {
             if (trim($val)) {
-                $brokerHost[] = $val;
+                $brokerHost[] = trim($val);
             }
         }
         if (count($brokerHost) === 0) {
@@ -37,7 +37,6 @@ class Process extends BaseProcess
 
         shuffle($brokerHost);
         $broker = $this->getBroker();
-
         foreach ($brokerHost as $host) {
             $client = $broker->getMetaConnect($host);
             if (! $client->isConnected()) {
@@ -58,10 +57,12 @@ class Process extends BaseProcess
             }
 
             // 更新 topics和brokers
+            if (empty($result['brokers'])) {
+                continue;
+            }
             $broker->setData($result['topics'], $result['brokers']);
-            return true;
         }
 
-        throw new ConnectionException($brokerList);
+        return true;
     }
 }

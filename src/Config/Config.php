@@ -61,7 +61,7 @@ class Config extends SplBean
         'brokerVersion'                 => '0.10.1.0',
         'metadataBrokerList'            => '',
         'requestTimeoutMs'              => 60000,// todo
-        'refreshIntervalMs'             => 10000,
+        'refreshIntervalMs'             => 1000,
         'securityProtocol'              => self::SECURITY_PROTOCOL_PLAINTEXT,
         'saslMechanism'                 => self::SASL_MECHANISMS_PLAIN,
         'saslUsername'                  => '',
