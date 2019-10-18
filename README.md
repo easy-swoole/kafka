@@ -28,7 +28,7 @@ $config = ProducerConfig::getInstance();
         ]);
     }
     
-    // 两张方式发送结果相同，都是单条生产
+    // 两张方式发送结果相同，都是单条顺序生产
     $producer->send([
         [
             'topic' => 'test',
@@ -69,3 +69,12 @@ go(function () {
     $consumer->subscribe();
 });
 ```
+
+### 附赠
+1. Kafka 集群部署 docker-compose.yml 一份，使用方式如下
+    1. 保证2181,9092,9093,9000端口未被占用（占用后可以修改compose文件中的端口号）
+    2. 根目录下，docker-compose up -d
+    3. 访问localhost:9000，可以查看kafka集群状态。
+    
+### Any Question
+
