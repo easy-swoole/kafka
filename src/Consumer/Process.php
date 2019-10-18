@@ -48,7 +48,7 @@ class Process extends BaseProcess
         try {
             $this->syncMeta();
 
-            $this->getGroupBrokerId();
+            $this->getGroup();
 
             $this->joinGroup();
 
@@ -65,7 +65,8 @@ class Process extends BaseProcess
 
                 $this->commit();
 
-                usleep($this->getConfig()->getRefreshIntervalMs() * 1000);
+                \Co::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
+//                usleep($this->getConfig()->getRefreshIntervalMs() * 1000);
             }
         } catch (\Throwable $throwable) {
             $this->onException($throwable);
@@ -86,16 +87,14 @@ class Process extends BaseProcess
      * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
-    public function getGroupBrokerId()
+    public function getGroup()
     {
         $results = Kafka\Group\Process::getInstance()->getGroupBrokerId();
-
         if (! isset($results['errorCode'], $results['nodeId'])
             || $results['errorCode'] !== Protocol::NO_ERROR
         ) {
             $this->stateConvert($results['errorCode']);
         }
-
         $this->getBroker()->setGroupBrokerId($results['nodeId']);
     }
 
@@ -333,10 +332,8 @@ class Process extends BaseProcess
             if ($errorCode === Protocol::UNKNOWN_MEMBER_ID) {
                 $this->getAssignment()->setMemberId('');
             }
-
             $this->getAssignment()->clearOffset();
         }
-
         if ($errorCode === Protocol::OFFSET_OUT_OF_RANGE) {
             $resetOffset      = $this->getConfig()->getOffsetReset();
             $offsets          = $resetOffset === 'latest' ?

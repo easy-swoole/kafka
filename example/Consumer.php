@@ -12,13 +12,11 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer;
 
 go(function () {
-
     $config = ConsumerConfig::getInstance();
     $config->setRefreshIntervalMs(1000);
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0');
     $config->setGroupId('test');
-    $config->setBrokerVersion('1.0.0');
 
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');

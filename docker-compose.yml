@@ -1,0 +1,42 @@
+# COMPOSE_PROJECT_NAME=kafkatest docker-compose -f docker-compose.yml up -d
+# COMPOSE_PROJECT_NAME=kafkatest docker-compose -f docker-compose.yml ps
+version: '2'
+services:
+  zookeeper:
+    image: jplock/zookeeper
+    ports:
+      - "2181:2181"
+  kafka:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: 127.0.0.1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: "PLAINTEXT://:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://127.0.0.1:9092"
+  kafka1:
+    image: wurstmeister/kafka:latest
+    ports:
+      - "9093:9093"
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ADVERTISED_HOST_NAME: 127.0.0.1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: "PLAINTEXT://:9093"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://127.0.0.1:9093"
+  kafka-manager:
+    image: sheepkiller/kafka-manager:latest
+    container_name: kafa-manager
+    ports:
+      - "9000:9000"
+    depends_on:            # 连接本compose文件创建的container
+      - kafka
+      - kafka1
+      - zookeeper
+    environment:
+      ZK_HOSTS: zookeeper:2181
+      KAFKA_BROKERS: kafka:9092,kafka1:9093
