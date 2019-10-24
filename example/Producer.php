@@ -14,11 +14,9 @@ use EasySwoole\Kafka\Producer;
 go(function () {
 
     $config = ProducerConfig::getInstance();
-    $config->setRefreshIntervalMs(10000);
-    $config->setMetadataBrokerList('127.0.0.1:9092');
+    $config->setMetadataBrokerList('127.0.0.1:9092,127.0.0.1:9093');
     $config->setBrokerVersion('0.9.0');
     $config->setRequiredAck(1);
-    $config->setProduceInterval(500);
 
     $producer = new Producer();
 

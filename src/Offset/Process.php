@@ -40,7 +40,6 @@ class Process extends BaseProcess
                         'partitions' => [],
                     ];
 
-
                     foreach ($partitions['partitions'] as $k => $partId) {
                         $item['partitions'][] = [
                             'partition_id' => $partId,
@@ -49,14 +48,14 @@ class Process extends BaseProcess
                         ];
                     }
 
-                    if(isset($data[$topic])){
-                        $data[$topic]['partitions'] = array_merge($data[$topic]['partitions'],$item['partitions']);
-                    }else{
+                    if (isset($data[$topic])) {
+                        $data[$topic]['partitions'] = array_merge($data[$topic]['partitions'], $item['partitions']);
+                    } else {
                         $data[$topic] = $item;
                     }
                 }
             }
-            $data = array_merge($data,[]);
+            $data = array_merge($data, []);
             $params = [
                 'replica_id' => -1,
                 'data'       => $data,
@@ -70,18 +69,19 @@ class Process extends BaseProcess
             $ret[] = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
         }
 
-        if(!empty($ret)){
+        if (!empty($ret)) {
             $result = [];
-            for($i = 0;$i<count($ret) ; $i++){
-                if($i == 0){
+            for ($i = 0; $i < count($ret); $i++) {
+                if ($i == 0) {
                     $result = $ret[$i];
                     continue;
                 }
-                foreach ($result as $k => $topic){
-                    foreach ($ret[$i] as $queryTopic)
-                    if($topic['topicName'] == $queryTopic['topicName']){
-                        $result[$k]['partitions'] = array_merge($result[$k]['partitions'],$queryTopic['partitions']);
-                        break;
+                foreach ($result as $k => $topic) {
+                    foreach ($ret[$i] as $queryTopic) {
+                        if ($topic['topicName'] == $queryTopic['topicName']) {
+                            $result[$k]['partitions'] = array_merge($result[$k]['partitions'], $queryTopic['partitions']);
+                            break;
+                        }
                     }
                 }
             }

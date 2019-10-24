@@ -22,8 +22,11 @@ class Assignment
      */
     private $memberId = '';
 
-    /** @var string  */
+    /**
+     * @var string
+     */
     private $leaderId = '';
+
     /**
      * @var int|null
      */
@@ -155,19 +158,20 @@ class Assignment
         $allTopics = $broker->getTopics();
         $subscribeTopics = $broker->getConfig()->getTopics();
         $memberCount = count($result);
-        if($this->memberId == $this->leaderId){
+        if ($this->memberId == $this->leaderId) {
             $retTopics = [];
-            foreach ($allTopics as $topicName => $topics){
-                foreach ($subscribeTopics as $k=>$topic){
-                    if($topicName == $topic){
+            foreach ($allTopics as $topicName => $topics) {
+                foreach ($subscribeTopics as $topic) {
+                    if ($topicName == $topic) {
                         $retTopics[$topicName] = $topics;
                     }
                 }
             }
+
             $members = [];
-            foreach ($result as $mk=>$member){
-                foreach ($retTopics as $topicName=>$topic){
-                    $m = ceil(count($topic)/$memberCount);
+            foreach ($result as $mk => $member) {
+                foreach ($retTopics as $topicName => $topic) {
+                    $m = ceil(count($topic) / $memberCount);
                     $startIndex = $m * $mk;
                     $endIndex = ($mk + 1) * $m - 1;
                     if (! isset($members[$mk])) {
@@ -181,7 +185,7 @@ class Assignment
                         $members[$mk][$topicName]['partitions'] = [];
                     }
 
-                    for($i = $startIndex ; $i<=$endIndex ; $i++){
+                    for ($i = $startIndex; $i <= $endIndex; $i++) {
                         $members[$mk][$topicName]['partitions'][] = $i;
                     }
 
@@ -196,49 +200,10 @@ class Assignment
                 ];
             }
             $this->setAssignments($data);
-        }
-        else{
+        } else {
             $data = [];
             $this->setAssignments($data);
         }
-
-//        $count   = 0;
-//        $members = [];
-//
-//        foreach ($allTopics as $topicName => $partition) {
-//            foreach ($partition as $partitionId => $leaderId) {
-//                $memberNum = $count % $memberCount;
-//
-//                if (! isset($members[$memberNum])) {
-//                    $members[$memberNum] = [];
-//                }
-//
-//                if (! isset($members[$memberNum][$topicName])) {
-//                    $members[$memberNum][$topicName] = [];
-//                }
-//
-//                $members[$memberNum][$topicName]['topic_name'] = $topicName;
-//
-//                if (! isset($members[$memberNum][$topicName]['partitions'])) {
-//                    $members[$memberNum][$topicName]['partitions'] = [];
-//                }
-//
-//                $members[$memberNum][$topicName]['partitions'][] = $partitionId;
-//                ++$count;
-//            }
-//        }
-//
-//        $data = [];
-//
-//        foreach ($result as $key => $member) {
-//            $data[] = [
-//                'version'     => 0,
-//                'member_id'   => $member['memberId'],
-//                'assignments' => $members[$key] ?? [],
-//            ];
-//        }
-//
-//        $this->setAssignments($data);
     }
 
     /**
