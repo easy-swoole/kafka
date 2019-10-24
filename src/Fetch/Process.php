@@ -10,7 +10,9 @@ namespace EasySwoole\Kafka\Fetch;
 use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Exception;
+use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
@@ -29,46 +31,68 @@ class Process extends BaseProcess
             return [];
         }
 
-        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
+        foreach ($this->getAssignment()->getTopics() as $nodeId => $topics) {
+            $data = [];
+            foreach ($topics as $topicName => $partitions) {
+                $item = [
+                    'topic_name' => $topicName,
+                    'partitions' => [],
+                ];
+                foreach ($offsets[$topicName] as $partId => $offset) {
 
-        if ($connect === null) {
-            throw new Exception\ConnectionException();
-        }
+                    if (in_array($partId, $partitions['partitions'])) {
 
-        $data = [];
-
-        foreach (ConsumerConfig::getInstance()->getTopics() as $topicName) {
-            if (empty($offsets[$topicName])) {
-                continue;
+                        $item['partitions'][] = [
+                            'partition_id' => $partId,
+                            'offset' => $offset > 0 ? $offset : 0,
+                            'max_bytes' => ConsumerConfig::getInstance()->getMaxBytes(),
+                        ];
+                    }
+                }
+                $data[] = $item;
             }
-
-            $item = [
-                'topic_name' => $topicName,
-                'partitions' => [],
+            $params = [
+                'max_wait_time'     => ConsumerConfig::getInstance()->getMaxWaitTime(),
+                'min_bytes'         => ConsumerConfig::getInstance()->getMinBytes(),
+                'replica_id'        => -1,
+                'data'              => $data,
             ];
 
-            foreach ($offsets[$topicName] as $partId => $offset) {
-                $item['partitions'][] = [
-                    'partition_id'      => $partId,
-                    'offset'            => $offset > 0 ? $offset: 0,
-                    'max_bytes'         => ConsumerConfig::getInstance()->getMaxBytes(),
-                ];
+            $connect = $this->getBroker()->getMetaConnect($nodeId);
+            if ($connect === null) {
+                throw new ConnectionException();
             }
-
-            $data[] = $item;
+            $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
+            $data = $connect->send($requestData);
+            $ret[] = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
         }
+        if(!empty($ret)) {
+            $allTopicName = [];
+            $throttleTime = [];
+            foreach ($ret as $keyRet => $valueRet){
+                foreach ($valueRet['topics'] as $keyTopics => $valueTopics){
+                    $allTopicName['topics'][$valueTopics['topicName']]['topicName'] = $valueTopics['topicName'];
+                    foreach ($valueTopics['partitions'] as $keyPartitions => $valuePartitions){
+                        if(!isset($throttleTime[$valueTopics['topicName']])){
+                            $throttleTime[$valueTopics['topicName']] = $valueRet['throttleTime'];
+                        }
+                        $allTopicName['topics'][$valueTopics['topicName']]['partitions'][] = $valuePartitions;
+                    }
+                }
+            }
+            $res = [];
+            foreach ($allTopicName['topics'] as $keyRes => $valueRes){
+                if(!isset($res['throttleTime'])){
+                    $res['throttleTime'] = $throttleTime[$keyRes];
+                }
+                $res['topics'][] = $valueRes;
+            }
+        }
+        return $res ?? [];
+    }
 
-        $params = [
-            'max_wait_time'     => ConsumerConfig::getInstance()->getMaxWaitTime(),
-            'min_bytes'         => ConsumerConfig::getInstance()->getMinBytes(),
-            'replica_id'        => -1,
-            'data'              => $data,
-        ];
-
-        $requestData = Protocol::encode(Protocol::FETCH_REQUEST, $params);
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::FETCH_REQUEST, substr($data, 8));
-
-        return $ret;
+    protected function getAssignment(): Assignment
+    {
+        return Assignment::getInstance();
     }
 }

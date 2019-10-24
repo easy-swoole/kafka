@@ -25,48 +25,69 @@ class Process extends BaseProcess
      */
     public function listOffset(): array
     {
-        $topics     = $this->getBroker()->getTopics();
+        $assignedTopics     = $this->getAssignment()->getTopics();
         $topicList  = ConsumerConfig::getInstance()->getTopics();
+        foreach ($assignedTopics as $nodeId => $topics) {
+            $data = [];
+            foreach ($topics as $topic => $partitions) {
+                foreach ($topicList as $topicName) {
+                    if ($topic !== $topicName) {
+                        continue;
+                    }
 
-        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
+                    $item = [
+                        'topic_name' => $topic,
+                        'partitions' => [],
+                    ];
 
-        if ($connect === null) {
-            throw new ConnectionException();
+
+                    foreach ($partitions['partitions'] as $k => $partId) {
+                        $item['partitions'][] = [
+                            'partition_id' => $partId,
+                            'offset' => 100,
+                            'time' =>  -1,
+                        ];
+                    }
+
+                    if(isset($data[$topic])){
+                        $data[$topic]['partitions'] = array_merge($data[$topic]['partitions'],$item['partitions']);
+                    }else{
+                        $data[$topic] = $item;
+                    }
+                }
+            }
+            $data = array_merge($data,[]);
+            $params = [
+                'replica_id' => -1,
+                'data'       => $data,
+            ];
+            $connect = $this->getBroker()->getMetaConnect($nodeId);
+            if ($connect === null) {
+                throw new ConnectionException();
+            }
+            $requestData = Protocol::encode(Protocol::OFFSET_REQUEST, $params);
+            $data = $connect->send($requestData);
+            $ret[] = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
         }
 
-        $data = [];
-        foreach ($topics as $topic => $partitions) {
-            foreach ($topicList as $topicName) {
-                if ($topic !== $topicName) {
+        if(!empty($ret)){
+            $result = [];
+            for($i = 0;$i<count($ret) ; $i++){
+                if($i == 0){
+                    $result = $ret[$i];
                     continue;
                 }
-
-                $item = [
-                    'topic_name' => $topic,
-                    'partitions' => [],
-                ];
-
-                foreach ($partitions as $partId => $leader) {
-                    $item['partitions'][] = [
-                        'partition_id' => $partId,
-                        'offset' => 100,
-                        'time' =>  -1,
-                    ];
+                foreach ($result as $k => $topic){
+                    foreach ($ret[$i] as $queryTopic)
+                    if($topic['topicName'] == $queryTopic['topicName']){
+                        $result[$k]['partitions'] = array_merge($result[$k]['partitions'],$queryTopic['partitions']);
+                        break;
+                    }
                 }
-                $data[] = $item;
             }
+
         }
-
-        $params = [
-            'replica_id' => -1,
-            'data'       => $data,
-        ];
-
-        $requestData = Protocol::encode(Protocol::OFFSET_REQUEST, $params);
-        $data = $connect->send($requestData);
-        $ret = Protocol::decode(Protocol::OFFSET_REQUEST, substr($data, 8));
-
-        return $ret;
+        return $result ?? [];
     }
 
     /**
