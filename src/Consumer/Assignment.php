@@ -15,11 +15,15 @@ class Assignment
 {
     use Singleton;
 
+    private $joinFuture = true;
+
     /**
      * @var string
      */
     private $memberId = '';
 
+    /** @var string  */
+    private $leaderId = '';
     /**
      * @var int|null
      */
@@ -70,6 +74,25 @@ class Assignment
      */
     private $preCommitOffsets = [];
 
+
+
+    /**
+     * @return bool
+     */
+    public function isJoinFuture(): bool
+    {
+        return $this->joinFuture;
+    }
+
+    /**
+     * @param bool $joinFuture
+     */
+    public function setJoinFuture(bool $joinFuture): void
+    {
+        $this->joinFuture = $joinFuture;
+    }
+
+
     public function setMemberId(string $memberId): void
     {
         $this->memberId = $memberId;
@@ -78,6 +101,22 @@ class Assignment
     public function getMemberId(): string
     {
         return $this->memberId;
+    }
+
+    /**
+     * @return string
+     */
+    public function getLeaderId(): string
+    {
+        return $this->leaderId;
+    }
+
+    /**
+     * @param string $leaderId
+     */
+    public function setLeaderId(string $leaderId): void
+    {
+        $this->leaderId = $leaderId;
     }
 
     public function setGenerationId(int $generationId): void
@@ -113,47 +152,93 @@ class Assignment
     {
         /** @var Broker $broker */
         $broker = Broker::getInstance();
-        $topics = $broker->getTopics();
-
+        $allTopics = $broker->getTopics();
+        $subscribeTopics = $broker->getConfig()->getTopics();
         $memberCount = count($result);
-
-        $count   = 0;
-        $members = [];
-
-        foreach ($topics as $topicName => $partition) {
-            foreach ($partition as $partitionId => $leaderId) {
-                $memberNum = $count % $memberCount;
-
-                if (! isset($members[$memberNum])) {
-                    $members[$memberNum] = [];
+        if($this->memberId == $this->leaderId){
+            $retTopics = [];
+            foreach ($allTopics as $topicName => $topics){
+                foreach ($subscribeTopics as $k=>$topic){
+                    if($topicName == $topic){
+                        $retTopics[$topicName] = $topics;
+                    }
                 }
-
-                if (! isset($members[$memberNum][$topicName])) {
-                    $members[$memberNum][$topicName] = [];
-                }
-
-                $members[$memberNum][$topicName]['topic_name'] = $topicName;
-
-                if (! isset($members[$memberNum][$topicName]['partitions'])) {
-                    $members[$memberNum][$topicName]['partitions'] = [];
-                }
-
-                $members[$memberNum][$topicName]['partitions'][] = $partitionId;
-                ++$count;
             }
+            $members = [];
+            foreach ($result as $mk=>$member){
+                foreach ($retTopics as $topicName=>$topic){
+                    $m = ceil(count($topic)/$memberCount);
+                    $startIndex = $m * $mk;
+                    $endIndex = ($mk + 1) * $m - 1;
+                    if (! isset($members[$mk])) {
+                        $members[$mk] = [];
+                    }
+                    if (! isset($members[$mk][$topicName])) {
+                        $members[$mk][$topicName] = [];
+                    }
+                    $members[$mk][$topicName]['topic_name'] = $topicName;
+                    if (! isset($members[$mk][$topicName]['partitions'])) {
+                        $members[$mk][$topicName]['partitions'] = [];
+                    }
+
+                    for($i = $startIndex ; $i<=$endIndex ; $i++){
+                        $members[$mk][$topicName]['partitions'][] = $i;
+                    }
+
+                }
+            }
+            $data = [];
+            foreach ($result as $key => $member) {
+                $data[] = [
+                    'version'     => 0,
+                    'member_id'   => $member['memberId'],
+                    'assignments' => $members[$key] ?? [],
+                ];
+            }
+            $this->setAssignments($data);
+        }
+        else{
+            $data = [];
+            $this->setAssignments($data);
         }
 
-        $data = [];
-
-        foreach ($result as $key => $member) {
-            $data[] = [
-                'version'     => 0,
-                'member_id'   => $member['memberId'],
-                'assignments' => $members[$key] ?? [],
-            ];
-        }
-
-        $this->setAssignments($data);
+//        $count   = 0;
+//        $members = [];
+//
+//        foreach ($allTopics as $topicName => $partition) {
+//            foreach ($partition as $partitionId => $leaderId) {
+//                $memberNum = $count % $memberCount;
+//
+//                if (! isset($members[$memberNum])) {
+//                    $members[$memberNum] = [];
+//                }
+//
+//                if (! isset($members[$memberNum][$topicName])) {
+//                    $members[$memberNum][$topicName] = [];
+//                }
+//
+//                $members[$memberNum][$topicName]['topic_name'] = $topicName;
+//
+//                if (! isset($members[$memberNum][$topicName]['partitions'])) {
+//                    $members[$memberNum][$topicName]['partitions'] = [];
+//                }
+//
+//                $members[$memberNum][$topicName]['partitions'][] = $partitionId;
+//                ++$count;
+//            }
+//        }
+//
+//        $data = [];
+//
+//        foreach ($result as $key => $member) {
+//            $data[] = [
+//                'version'     => 0,
+//                'member_id'   => $member['memberId'],
+//                'assignments' => $members[$key] ?? [],
+//            ];
+//        }
+//
+//        $this->setAssignments($data);
     }
 
     /**

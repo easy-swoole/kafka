@@ -52,7 +52,6 @@ class Process extends BaseProcess
         $requestData = Protocol::encode(Protocol::GROUP_COORDINATOR_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::GROUP_COORDINATOR_REQUEST, substr($data, 8));
-
         return $ret;
     }
 
@@ -88,7 +87,6 @@ class Process extends BaseProcess
         $requestData = Protocol::encode(Protocol::JOIN_GROUP_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::JOIN_GROUP_REQUEST, substr($data, 8));
-
         return $ret;
     }
 
@@ -124,7 +122,7 @@ class Process extends BaseProcess
      * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function syncGroup(): array
+    public function syncGroupOnJoinLeader(): array
     {
         $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
 
@@ -137,18 +135,44 @@ class Process extends BaseProcess
         $generationId = $assign->getGenerationId();
 
         $params = [
-            'group_id'      => $this->getConfig()->getGroupId(),
+            'group_id' => $this->getConfig()->getGroupId(),
             'generation_id' => $generationId,
-            'member_id'     => $memberId,
-            'data'          => $assign->getAssignments(),
+            'member_id' => $memberId,
+            'data' => $assign->getAssignments(),
         ];
 
         $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
-
         return $ret;
     }
+
+
+    public function syncGroupOnJoinFollower(): array
+    {
+        $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
+
+        if ($connect === null) {
+            throw new ConnectionException();
+        }
+
+        $assign       = $this->getAssignment();
+        $memberId     = $assign->getMemberId();
+        $generationId = $assign->getGenerationId();
+        $params = [
+            'group_id' => $this->getConfig()->getGroupId(),
+            'generation_id' => $generationId,
+            'member_id' => $memberId,
+            'data'=>[]
+        ];
+        $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
+        $data = $connect->send($requestData);
+        $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
+        return $ret;
+    }
+
+
+
 
     /**
      * @return array

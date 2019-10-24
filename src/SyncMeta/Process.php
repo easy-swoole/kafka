@@ -62,7 +62,6 @@ class Process extends BaseProcess
             }
             $broker->setData($result['topics'], $result['brokers']);
         }
-
         return true;
     }
 }

@@ -12,6 +12,7 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
+use SebastianBergmann\CodeCoverage\Report\PHP;
 
 class Process extends BaseProcess
 {
@@ -45,16 +46,13 @@ class Process extends BaseProcess
      */
     public function subscribe()
     {
-        try {
-            $this->syncMeta();
-
-            $this->getGroup();
-
-            $this->joinGroup();
-
-            $this->syncGroup();
-
-            while (true) {
+        while (true) {
+            try {
+                if ($this->getAssignment()->isJoinFuture()) {
+                    $this->syncMeta();
+                    $this->getGroup();
+                    $this->initiateJoinGroup();
+                }
                 $this->heartbeat();
 
                 $this->getListOffset();
@@ -66,10 +64,14 @@ class Process extends BaseProcess
                 $this->commit();
 
                 \Co::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
-//                usleep($this->getConfig()->getRefreshIntervalMs() * 1000);
+
+            } catch (Exception\ErrorCodeException $codeException) {
+                $this->getAssignment()->setJoinFuture(true);
+                //echo '----------------group 成员 或者 partition数量变更 需要重新入组与分配partition'.PHP_EOL;
+            } catch (\Throwable $throwable) {
+
+                throw  $throwable;
             }
-        } catch (\Throwable $throwable) {
-            $this->onException($throwable);
         }
     }
 
@@ -98,57 +100,75 @@ class Process extends BaseProcess
         $this->getBroker()->setGroupBrokerId($results['nodeId']);
     }
 
-    /**
-     * @throws Exception\ConnectionException
-     * @throws Exception\ErrorCodeException
-     * @throws Exception\Exception
-     */
-    public function joinGroup()
-    {
-        $result = Kafka\Group\Process::getInstance()->joinGroup();
-        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
-            $this->stateConvert($result['errorCode']);
-        }
 
-        $this->getAssignment()->setMemberId($result['memberId']);
-        $this->getAssignment()->setGenerationId($result['generationId']);
-        $this->getAssignment()->assign($result['members']);
+
+    public function initiateJoinGroup(){
+
+        if($this->getAssignment()->isJoinFuture()){
+            $isLeader = $this->joinGroup();
+            $this->syncGroup($isLeader);
+        }
     }
 
     /**
      * @throws Exception\ConnectionException
      * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
+     * @return bool
      */
-    public function syncGroup()
+    protected function joinGroup() : bool
     {
-        $result = Kafka\Group\Process::getInstance()->syncGroup();
+        $result = Kafka\Group\Process::getInstance()->joinGroup();
+
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
             $this->stateConvert($result['errorCode']);
         }
+        $this->getAssignment()->setMemberId($result['memberId']);
+        $this->getAssignment()->setGenerationId($result['generationId']);
+        $this->getAssignment()->setLeaderId($result['leaderId']);
+        $this->getAssignment()->assign($result['members']);
 
+        return $result['leaderId'] == $result['memberId'] ? true : false;
+    }
+
+    /**
+     * @param  bool $isLeader
+     * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
+     * @throws Exception\Exception
+     */
+    protected function syncGroup(bool $isLeader)
+    {
+        if ($isLeader){
+            $result = Kafka\Group\Process::getInstance()->syncGroupOnJoinLeader();
+        }
+        else{
+            $result = Kafka\Group\Process::getInstance()->syncGroupOnJoinFollower();
+        }
+
+        if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
+            $this->stateConvert($result['errorCode']);
+        }
         $topics = $this->getBroker()->getTopics();
-
         $brokerToTopics = [];
-
         foreach ($result['partitionAssignments'] as $topic) {
             foreach ($topic['partitions'] as $partId) {
-                $brokerId = $topics[$topic['topicName']][$partId];
-
-                $brokerToTopics[$brokerId] = $brokerToTopics[$brokerId] ?? [];
-
-                $topicInfo = $brokerToTopics[$brokerId][$topic['topicName']] ?? [];
-
-                $topicInfo['topic_name'] = $topic['topicName'];
-
-                $topicInfo['partitions']   = $topicInfo['partitions'] ?? [];
-                $topicInfo['partitions'][] = $partId;
-
-                $brokerToTopics[$brokerId][$topic['topicName']] = $topicInfo;
+                if (isset($topics[$topic['topicName']][$partId])) {
+                    $brokerId = $topics[$topic['topicName']][$partId];
+                    $brokerToTopics[$brokerId] = $brokerToTopics[$brokerId] ?? [];
+                    $topicInfo = $brokerToTopics[$brokerId][$topic['topicName']] ?? [];
+                    $topicInfo['topic_name'] = $topic['topicName'];
+                    $topicInfo['partitions'] = $topicInfo['partitions'] ?? [];
+                    $topicInfo['partitions'][] = $partId;
+                    $brokerToTopics[$brokerId][$topic['topicName']] = $topicInfo;
+                }
             }
         }
         $assign = $this->getAssignment();
-        $assign->setTopics($brokerToTopics);
+        if (!empty($brokerToTopics)) {
+            $assign->setTopics($brokerToTopics);
+            $assign->setJoinFuture(false);
+        }
     }
 
     /**
@@ -174,7 +194,6 @@ class Process extends BaseProcess
                 $lastOffsets[$topic['topicName']][$part['partition']]   = $part['offsets'][0];
             }
         }
-
         $this->getAssignment()->setOffsets($offsets);
         $this->getAssignment()->setLastOffsets($lastOffsets);
     }
@@ -200,7 +219,6 @@ class Process extends BaseProcess
     public function fetchOffset()
     {
         $result = Kafka\Offset\Process::getInstance()->fetchOffset();
-
         $offsets = $this->getAssignment()->getFetchOffsets();
         foreach ($result as $topic) {
             foreach ($topic['partitions'] as $part) {
@@ -212,7 +230,6 @@ class Process extends BaseProcess
                 $offsets[$topic['topicName']][$part['partition']] = $part['offset'];
             }
         }
-
         $this->getAssignment()->setFetchOffsets($offsets);
 
         $consumerOffsets    = $this->getAssignment()->getConsumerOffsets();
@@ -227,9 +244,8 @@ class Process extends BaseProcess
                     }
                 }
             }
-
             $this->getAssignment()->setConsumerOffsets($consumerOffsets);
-            $this->getAssignment()->setCommitOffsets($this->getAssignment()->getFetchOffsets());
+            //$this->getAssignment()->setCommitOffsets($this->getAssignment()->getFetchOffsets());
         }
     }
 
@@ -242,8 +258,8 @@ class Process extends BaseProcess
     public function fetchMsg()
     {
         $results = Kafka\Fetch\Process::getInstance()->fetch($this->getAssignment()->getConsumerOffsets());
-
-        foreach ($results['topics'] as $topic) {
+        if(!isset($results['topics'])) return [] ;
+        foreach ($results['topics'] as $k => $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== 0) {
                     $this->stateConvert($part['errorCode'], [
@@ -252,21 +268,21 @@ class Process extends BaseProcess
                     ]);
                     continue;
                 }
-
                 $offset = $this->getAssignment()->getConsumerOffset($topic['topicName'], $part['partition']);
-
                 if ($offset === null) {
                     return [];
                 }
 
                 foreach ($part['messages'] as $message) {
-                    $this->messages[$topic['topicName']][$part['partition']][] = $message;
-                    $offset = $message['offset'];// 当前消息的偏移量
+                    if (!empty($message)) {
+                        $this->messages[$topic['topicName']][$part['partition']][] = $message;
+                        $offset = $message['offset'];// 当前消息的偏移量
+                        //echo '-----------------订阅到新的消息需要处理-----topic:'.$topic['topicName'].'-------partition:'.$part['partition'].'------offset:'.$offset.'--------------'.PHP_EOL;
+                        $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
+                    }
                 }
-
                 $consumerOffset = ($part['highwaterMarkOffset'] > $offset) ? ($offset + 1) : $offset;
                 $this->getAssignment()->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
-                $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
             }
         }
     }
@@ -282,16 +298,20 @@ class Process extends BaseProcess
         if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_BEFORE_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
-        $results = Kafka\Offset\Process::getInstance()->commit($this->getAssignment()->getCommitOffsets());
 
-        foreach ($results as $topic) {
-            foreach ($topic['partitions'] as $part) {
-                if ($part['errorCode'] !== Protocol::NO_ERROR) {
-                    $this->stateConvert($part['errorCode']);
+        $commitOffset = $this->getAssignment()->getCommitOffsets();
+        if(!empty($commitOffset)) {
+            //echo '--------------有消费需要提交'.PHP_EOL;
+            $results = Kafka\Offset\Process::getInstance()->commit($commitOffset);
+            foreach ($results as $topic) {
+                foreach ($topic['partitions'] as $part) {
+                    if ($part['errorCode'] !== Protocol::NO_ERROR) {
+                        $this->stateConvert($part['errorCode']);
+                    }
                 }
             }
+            $this->getAssignment()->setCommitOffsets([]);
         }
-
         // 先提交，再消费。默认此项
         if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_AFTER_COMMIT_OFFSET) {
             $this->consumeMessage();
@@ -345,7 +365,6 @@ class Process extends BaseProcess
                 $this->getAssignment()->setConsumerOffset($topic, (int) $partId, $offsets[$topic][$partId]);
             }
         }
-
         throw new Exception\ErrorCodeException(Protocol::getError($errorCode));
     }
 
