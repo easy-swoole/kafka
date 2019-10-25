@@ -135,19 +135,25 @@ class Process extends BaseProcess
         $generationId = $assign->getGenerationId();
 
         $params = [
-            'group_id' => $this->getConfig()->getGroupId(),
+            'group_id'      => $this->getConfig()->getGroupId(),
             'generation_id' => $generationId,
-            'member_id' => $memberId,
-            'data' => $assign->getAssignments(),
+            'member_id'     => $memberId,
+            'data'          => $assign->getAssignments(),// leader可以同步data数据
         ];
 
         $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
+
         return $ret;
     }
 
-
+    /**
+     * @return array
+     * @throws ConnectionException
+     * @throws \EasySwoole\Kafka\Exception\Config
+     * @throws \EasySwoole\Kafka\Exception\Exception
+     */
     public function syncGroupOnJoinFollower(): array
     {
         $connect = $this->getBroker()->getMetaConnect($this->getBroker()->getGroupBrokerId());
@@ -160,19 +166,17 @@ class Process extends BaseProcess
         $memberId     = $assign->getMemberId();
         $generationId = $assign->getGenerationId();
         $params = [
-            'group_id' => $this->getConfig()->getGroupId(),
+            'group_id'      => $this->getConfig()->getGroupId(),
             'generation_id' => $generationId,
-            'member_id' => $memberId,
-            'data'=>[]
+            'member_id'     => $memberId,
+            'data'          => []
         ];
         $requestData = Protocol::encode(Protocol::SYNC_GROUP_REQUEST, $params);
         $data = $connect->send($requestData);
         $ret = Protocol::decode(Protocol::SYNC_GROUP_REQUEST, substr($data, 8));
+
         return $ret;
     }
-
-
-
 
     /**
      * @return array
