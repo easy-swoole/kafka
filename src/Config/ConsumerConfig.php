@@ -7,7 +7,6 @@
  */
 namespace EasySwoole\Kafka\Config;
 
-use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Exception;
 
 /**
@@ -26,7 +25,6 @@ use EasySwoole\Kafka\Exception;
  */
 class ConsumerConfig extends Config
 {
-    use Singleton;
 
     public const CONSUME_AFTER_COMMIT_OFFSET  = 1;
     public const CONSUME_BEFORE_COMMIT_OFFSET = 2;

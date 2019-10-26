@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\ProducerConfig;
 use EasySwoole\Kafka\Producer\Process;
 
 class Producer
@@ -15,12 +16,13 @@ class Producer
 
     /**
      * Producer constructor.
-     * @param callable|null $producer
+     * @param ProducerConfig $config
+     * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
-    public function __construct(?callable $producer = null)
+    public function __construct(ProducerConfig $config)
     {
-        $this->process = new Process();
+        $this->process = new Process($config);
     }
 
     /**

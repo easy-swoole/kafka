@@ -18,10 +18,11 @@ go(function () {
     $config->setGroupId('test');
     $config->setTopics(['test']);
 
-    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
-    $offset = new Offset();
+    $syncMeta = new EasySwoole\Kafka\SyncMeta\Process($config);
+    $broker = $syncMeta->syncMeta();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
+    $offset = new Offset($config, new \EasySwoole\Kafka\Consumer\Assignment(), $broker);
     $result = $offset->fetchOffset();
     var_dump($result);
 });

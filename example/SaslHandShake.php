@@ -18,9 +18,10 @@ go(function () {
     $config->setBrokerVersion('0.8.2');
     $config->setSaslMechanism('PLAIN');
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $saslHandShake = new SaslHandShake();
+    $saslHandShake = new SaslHandShake($config, $broker);
     $result = $saslHandShake->handShake();
     var_dump($result);
 });

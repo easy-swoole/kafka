@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\SaslHandShake\Process;
 
 class SaslHandShake
@@ -15,11 +16,13 @@ class SaslHandShake
 
     /**
      * SaslHandShake constructor.
+     * @param Config $config
+     * @param Broker $broker
      * @throws Exception\Exception
      */
-    public function __construct()
+    public function __construct(Config $config, Broker $broker)
     {
-        $this->process = new Process();
+        $this->process = new Process($config, $broker);
     }
 
     /**

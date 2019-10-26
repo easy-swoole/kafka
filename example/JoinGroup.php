@@ -17,9 +17,10 @@ go(function () {
     $config->setBrokerVersion('0.8.2');
     $config->setGroupId('test');
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $group = new Group();
+    $group = new Group($config, new \EasySwoole\Kafka\Consumer\Assignment(), $broker);
     $result = $group->joinGroup();
     var_dump($result);
 });

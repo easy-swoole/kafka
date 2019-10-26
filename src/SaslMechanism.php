@@ -9,5 +9,5 @@ namespace EasySwoole\Kafka;
 
 interface SaslMechanism
 {
-    public function autheticate(CommonClient $client): void;
+    public function autheticate(Client $client): void;
 }

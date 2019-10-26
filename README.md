@@ -3,71 +3,112 @@
 
 # 安装
 ```php
-
+composer required easyswoole/kafka
 ```
 
-### 生产者
+### 注册kafka服务
 ```php
-use EasySwoole\Kafka\Config\ProducerConfig;
-use EasySwoole\Kafka\Producer;
+namespace EasySwoole\EasySwoole;
 
-$config = ProducerConfig::getInstance();
-    $config->setMetadataBrokerList('127.0.0.1:9092,127.0.0.1:9093');
-    $config->setBrokerVersion('0.9.0');
-    $config->setRequiredAck(1);
+use App\Producer\Process as ProducerProcess;
+use App\Consumer\Process as ConsumerProcess;
+use EasySwoole\EasySwoole\Swoole\EventRegister;
+use EasySwoole\EasySwoole\AbstractInterface\Event;
+use EasySwoole\Http\Request;
+use EasySwoole\Http\Response;
 
-    $producer = new Producer();
+class EasySwooleEvent implements Event
+{
 
-    for ($i = 0; $i < 50; $i++) {
-        $producer->send([
-            [
-                'topic' => 'test',
-                'value' => 'message' . $i,
-                'key'   => 'key' . $i,
-            ]
-        ]);
+    public static function initialize()
+    {
+        // TODO: Implement initialize() method.
+        date_default_timezone_set('Asia/Shanghai');
+    }
+
+    public static function mainServerCreate(EventRegister $register)
+    {
+        // TODO: Implement mainServerCreate() method.
+        // 生产者
+        ServerManager::getInstance()->getSwooleServer()->addProcess((new ProducerProcess())->getProcess());
+        // 消费者
+        ServerManager::getInstance()->getSwooleServer()->addProcess((new ConsumerProcess())->getProcess());
     }
     
-    // 两张方式发送结果相同，都是单条顺序生产
-    $producer->send([
-        [
-            'topic' => 'test',
-            'value' => 'message1',
-            'key'   => 'key1',
-        ],
-        [
-            'topic' => 'test',
-            'value' => 'message2',
-            'key'   => 'key2',
-        ]
-    ]);
+    ......
     
+}
+
+```
+### 生产者
+```php
+namespace App\Producer;
+
+use EasySwoole\Component\Process\AbstractProcess;
+use EasySwoole\Kafka\Config\ProducerConfig;
+use EasySwoole\Kafka\kafka;
+
+class Process extends AbstractProcess
+{
+    protected function run($arg)
+    {
+        go(function () {
+            $config = new ProducerConfig();
+            $config->setMetadataBrokerList('127.0.0.1:9092,127.0.0.1:9093');
+            $config->setBrokerVersion('0.9.0');
+            $config->setRequiredAck(1);
+
+            $kafka = new kafka($config);
+            $result = $kafka->producer()->send([
+                [
+                    'topic' => 'test',
+                    'value' => 'message--',
+                    'key'   => 'key--',
+                ],
+            ]);
+
+            var_dump($result);
+            var_dump('ok');
+        });
+    }
+}
 ```
 
 
 ### 消费者
 ```php
+namespace App\Consumer;
+
+use EasySwoole\Component\Process\AbstractProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
-use EasySwoole\Kafka\Consumer;
+use EasySwoole\Kafka\kafka;
 
-go(function () {
-    $config = ConsumerConfig::getInstance();
-    $config->setRefreshIntervalMs(1000);// 消费间隔
-    $config->setMetadataBrokerList('127.0.0.1:9092');//节点host
-    $config->setBrokerVersion('0.9.0');//kafka版本
-    $config->setGroupId('test');// groupId
+class Process extends AbstractProcess
+{
+    protected function run($arg)
+    {
+        go(function () {
+            $config = new ConsumerConfig();
+            $config->setRefreshIntervalMs(1000);
+            $config->setMetadataBrokerList('127.0.0.1:9092,127.0.0.1:9093');
+            $config->setBrokerVersion('0.9.0');
+            $config->setGroupId('test');
 
-    $config->setTopics(['test']);// 订阅的topic
-    $config->setOffsetReset('earliest');
+            $config->setTopics(['test']);
+            $config->setOffsetReset('earliest');
 
-    $consumer = new Consumer(function ($topic, $partition, $message) {
-        var_dump($topic);
-        var_dump($partition);
-        var_dump($message);
-    });
+            $kafka = new kafka($config);
+            // 设置消费回调
+            $func = function ($topic, $partition, $message) {
+                var_dump($topic);
+                var_dump($partition);
+                var_dump($message);
+            };
+            $kafka->consumer()->subscribe($func);
+        });
+    }
+}
 
-    $consumer->subscribe();
-});
 ```
 
 ### 附赠
@@ -77,4 +118,5 @@ go(function () {
     3. 访问localhost:9000，可以查看kafka集群状态。
     
 ### Any Question
-
+kafka使用问题及bug，欢迎到Easyswoole的kaka群中提问或反馈
+QQ群号：827432930

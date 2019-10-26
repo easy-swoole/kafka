@@ -7,15 +7,12 @@
  */
 namespace EasySwoole\Kafka;
 
-use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\Config\Config;
 use EasySwoole\Kafka\Sasl\Plain;
 use EasySwoole\Kafka\Exception;
 
 class Broker
 {
-    use Singleton;
-
     /**
      * @var int
      */

@@ -8,6 +8,7 @@
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\Config\Config;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Exception\Exception;
 
 class BaseProcess
@@ -18,17 +19,28 @@ class BaseProcess
     protected $config;
 
     /**
+     * @var Assignment
+     */
+    protected $assignment;
+
+    /**
+     * @var Broker
+     */
+    private $broker;
+
+    /**
      * @var array
      */
     protected $brokerHost = [];
 
     /**
      * BaseProcess constructor.
+     * @param Config $config
      * @throws Exception
      */
-    public function __construct()
+    public function __construct(Config $config)
     {
-        $this->config       = $this->getConfig();
+        $this->setConfig($config);
         $this->brokerHost   = $this->getBrokerLists();
         $this->getBroker()->setConfig($this->config);
 
@@ -56,13 +68,54 @@ class BaseProcess
         return $brokerHost;
     }
 
+    /**
+     * @return Broker
+     */
     protected function getBroker(): Broker
     {
-        return Broker::getInstance();
+        if ($this->broker === null) {
+            $this->broker = new Broker();
+        }
+        return $this->broker;
     }
 
+    /**
+     * @param Broker $broker
+     */
+    public function setBroker(Broker $broker): void
+    {
+        $this->broker = $broker;
+    }
+
+    /**
+     * @return Config|mixed
+     */
     protected function getConfig()
     {
-        return new Config();
+        return $this->config;
+    }
+
+    /**
+     * @param Config $config
+     */
+    public function setConfig(Config $config): void
+    {
+        $this->config = $config;
+    }
+
+    /**
+     * @return Assignment
+     */
+    public function getAssignment(): Assignment
+    {
+        return $this->assignment;
+    }
+
+    /**
+     * @param Assignment $assignment
+     */
+    public function setAssignment(Assignment $assignment): void
+    {
+        $this->assignment = $assignment;
     }
 }

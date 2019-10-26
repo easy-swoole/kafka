@@ -9,15 +9,17 @@ require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Group;
-use EasySwoole\Kafka\Config\Config;
+use EasySwoole\Kafka\Config\ConsumerConfig;
 
 go(function () {
-    $config = new Config();
+    $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.8.2');
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
 
-    $group = new Group();
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
+
+    $group = new Group($config, new \EasySwoole\Kafka\Consumer\Assignment(), $broker);
     $result = $group->listGroup();
     var_dump($result);
 });

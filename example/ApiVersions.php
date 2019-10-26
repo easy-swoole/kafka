@@ -16,9 +16,10 @@ go(function () {
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.10.0.0');
 
-    $apiVersions = new ApiVersions();
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $apiVersions = new ApiVersions($config, $broker);
 
     $result = $apiVersions->getVersions();
     var_dump($result);

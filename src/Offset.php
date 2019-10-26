@@ -7,6 +7,8 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\ConsumerConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Offset\Process;
 
 class Offset
@@ -15,11 +17,14 @@ class Offset
 
     /**
      * Offset constructor.
+     * @param ConsumerConfig $config
+     * @param Assignment     $assignment
+     * @param Broker         $broker
      * @throws Exception\Exception
      */
-    public function __construct()
+    public function __construct(ConsumerConfig $config, Assignment $assignment, Broker $broker)
     {
-        $this->process = new Process();
+        $this->process = new Process($config, $assignment, $broker);
     }
 
     /**
@@ -45,7 +50,6 @@ class Offset
     /**
      * @param array $commitOffsets
      * @return array
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */

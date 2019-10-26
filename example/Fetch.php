@@ -13,14 +13,15 @@ use EasySwoole\Kafka\Fetch;
 
 go(function () {
 
-    $config = ConsumerConfig::getInstance();
+    $config = new ConsumerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092');
     $config->setBrokerVersion('0.9.0');
 
-    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $syncMeta = new EasySwoole\Kafka\SyncMeta\Process($config);
+    $broker = $syncMeta->syncMeta();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $fetch = new Fetch();
+    $fetch = new Fetch($config, new \EasySwoole\Kafka\Consumer\Assignment(), $broker);
     $result = $fetch->fetch();
     var_dump($result);
 });

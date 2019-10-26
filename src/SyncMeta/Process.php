@@ -7,7 +7,6 @@
  */
 namespace EasySwoole\Kafka\SyncMeta;
 
-use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Exception\Exception;
@@ -15,12 +14,11 @@ use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
 {
-    use Singleton;
-
     /**
-     * @return bool
+     * @return \EasySwoole\Kafka\Broker
      * @throws ConnectionException
      * @throws Exception
+     * @throws \EasySwoole\Kafka\Exception\ErrorCodeException
      */
     public function syncMeta()
     {
@@ -62,6 +60,7 @@ class Process extends BaseProcess
             }
             $broker->setData($result['topics'], $result['brokers']);
         }
-        return true;
+
+        return $broker;
     }
 }

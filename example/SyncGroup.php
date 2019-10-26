@@ -18,15 +18,17 @@ go(function () {
     $config->setBrokerVersion('0.8.2');
     $config->setGroupId('test');
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $syncMeta = new EasySwoole\Kafka\SyncMeta\Process($config);
+    $broker = $syncMeta->syncMeta();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
+    $assignment = new Assignment();
 
-    $group = new Group();
+    $group = new Group($config, $assignment, $broker);
     $ret = $group->joinGroup();
-    Assignment::getInstance()->setGenerationId($ret['generationId']);
-    Assignment::getInstance()->setMemberId($ret['memberId']);
-    Assignment::getInstance()->assign($ret['members']);
-//    Assignment::getInstance()->setGenerationId(1);
-//    Assignment::getInstance()->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
+    $assignment->setGenerationId($ret['generationId']);
+    $assignment->setMemberId($ret['memberId']);
+    $assignment->assign($ret['members'], $broker);
+
     $result = $group->syncGroup();
     var_dump($result);
 });

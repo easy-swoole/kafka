@@ -9,25 +9,21 @@ require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Config\ProducerConfig;
-use EasySwoole\Kafka\Producer;
+use EasySwoole\Kafka\kafka;
 
 go(function () {
 
-    $config = ProducerConfig::getInstance();
+    $config = new ProducerConfig();
     $config->setMetadataBrokerList('127.0.0.1:9092,127.0.0.1:9093');
     $config->setBrokerVersion('0.9.0');
     $config->setRequiredAck(1);
-
-    $producer = new Producer();
-
-    for ($i = 0; $i < 50; $i++) {
-        $producer->send([
-            [
-                'topic' => 'test',
-                'value' => 'message--' . $i,
-                'key'   => 'key--' . $i,
-            ]
-        ]);
-    }
-    var_dump('ok');
+    $kafka = new kafka($config);
+    $result = $kafka->producer()->send([
+        [
+        'topic' => 'test',
+        'value' => 'message--',
+        'key'   => 'key--',
+        ],
+    ]);
+    var_dump($result);
 });
