@@ -11,27 +11,26 @@ use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Exception\Exception;
 use EasySwoole\Kafka\Config\ProducerConfig;
 use EasySwoole\Kafka\Protocol;
+use EasySwoole\Kafka\SyncMeta;
 
 class Process extends BaseProcess
 {
     private $recordValidator;
 
     /**
-     * SyncProcess constructor.
-     * SyncProcess constructor.
-     * @param RecordValidator|null $recordValidator
+     * Process constructor.
+     * @param ProducerConfig $config
      * @throws Exception
+     * @throws \EasySwoole\Kafka\Exception\ConnectionException
      */
-    public function __construct(?RecordValidator $recordValidator = null)
+    public function __construct(ProducerConfig $config)
     {
-        parent::__construct();
+        parent::__construct($config);
 
-        $this->recordValidator = $recordValidator ?? new RecordValidator();
+        $this->recordValidator = new RecordValidator();
 
-        $this->config = $this->getConfig();
-        $this->getBroker()->setConfig($this->config);
-
-        \EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
+        $syncMeta = new SyncMeta\Process($config);
+        $this->setBroker($syncMeta->syncMeta());
     }
 
     /**
@@ -127,13 +126,5 @@ class Process extends BaseProcess
         }
 
         return $sendData;
-    }
-
-    /**
-     * @return ProducerConfig
-     */
-    protected function getConfig(): ProducerConfig
-    {
-        return ProducerConfig::getInstance();
     }
 }

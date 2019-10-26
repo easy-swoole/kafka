@@ -23,9 +23,6 @@ use EasySwoole\Kafka\Exception;
  */
 class ProducerConfig extends Config
 {
-
-    use Singleton;
-
     private const COMPRESSION_OPTIONS = [
         Produce::COMPRESSION_NONE,
         Produce::COMPRESSION_GZIP,

@@ -19,15 +19,14 @@ go(function () {
 
     $config->setGroupId('test');
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
-    $ret = EasySwoole\Kafka\Group\Process::getInstance()->joinGroup();
-    $assign = Assignment::getInstance();
-    $assign->setMemberId($ret['memberId']);
-    $assign->setGenerationId($ret['generationId']);
-//    $assign->setGenerationId(2);
-//    $assign->setMemberId('Easyswoole-kafka-d2a3bca8-6709-457c-8d6b-95fe7f95a107');
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $heartbeat = new Heartbeat();
+    $assign = new Assignment();
+    $assign->setMemberId('');
+    $assign->setGenerationId(0);
+
+    $heartbeat = new Heartbeat($config, $assign, $broker);
 
     $result = $heartbeat->beat();
     var_dump($result);

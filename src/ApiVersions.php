@@ -8,6 +8,7 @@
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\ApiVersions\Process;
+use EasySwoole\Kafka\Config\Config;
 
 class ApiVersions
 {
@@ -15,11 +16,13 @@ class ApiVersions
 
     /**
      * ApiVersions constructor.
+     * @param Config $config
+     * @param Broker $broker
      * @throws Exception\Exception
      */
-    public function __construct()
+    public function __construct(Config $config, Broker $broker)
     {
-        $this->process = new Process();
+        $this->process = new Process($config, $broker);
     }
 
     /**

@@ -7,8 +7,8 @@
  */
 namespace EasySwoole\Kafka\Heartbeat;
 
-use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Exception\ConnectionException;
@@ -16,7 +16,13 @@ use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
 {
-    use Singleton;
+    public function __construct(ConsumerConfig $config, Assignment $assignment, Broker $broker)
+    {
+        parent::__construct($config);
+
+        $this->setAssignment($assignment);
+        $this->setBroker($broker);
+    }
 
     /**
      * @return array
@@ -32,9 +38,9 @@ class Process extends BaseProcess
         }
 
         $params = [
-            'group_id'      => ConsumerConfig::getInstance()->getGroupId(),
-            'generation_id' => Assignment::getInstance()->getGenerationId(),
-            'member_id'     => Assignment::getInstance()->getMemberId(),
+            'group_id'      => (new ConsumerConfig())->getGroupId(),
+            'generation_id' => $this->getAssignment()->getGenerationId(),
+            'member_id'     => $this->getAssignment()->getMemberId(),
         ];
 
         $requestData = Protocol::encode(Protocol::HEART_BEAT_REQUEST, $params);

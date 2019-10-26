@@ -19,22 +19,22 @@ class Consumer
 
     /**
      * Consumer constructor.
-     * @param callable|null $func
+     * @param ConsumerConfig $config
      * @throws Exception\Exception
      */
-    public function __construct(?callable $func = null)
+    public function __construct(ConsumerConfig $config)
     {
-        $this->process = new Process($func);
+        $this->process = new Process($config);
     }
 
     /**
+     * @param callable|null $func
      * @throws \Throwable
      */
-    public function subscribe()
+    public function subscribe(?callable $func = null)
     {
-        $this->process->subscribe();
+        $this->process->subscribe($func);
     }
-
 
     /**
      * @throws Exception\Config
@@ -42,6 +42,6 @@ class Consumer
     public function stop()
     {
         // todo
-        ConsumerConfig::getInstance()->setConsumeStatus(false);
+        (new ConsumerConfig())->setConsumeStatus(false);
     }
 }

@@ -7,6 +7,8 @@
  */
 namespace EasySwoole\Kafka;
 
+use EasySwoole\Kafka\Config\ConsumerConfig;
+use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Group\Process;
 
 class Group
@@ -15,16 +17,18 @@ class Group
 
     /**
      * Group constructor.
+     * @param ConsumerConfig $config
+     * @param Assignment     $assignment
+     * @param Broker         $broker
      * @throws Exception\Exception
      */
-    public function __construct()
+    public function __construct(ConsumerConfig $config, Assignment $assignment, Broker $broker)
     {
-        $this->process = new Process();
+        $this->process = new Process($config, $assignment, $broker);
     }
 
     /**
      * @return array
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
@@ -45,7 +49,6 @@ class Group
 
     /**
      * @return array
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */
@@ -61,12 +64,11 @@ class Group
      */
     public function syncGroup()
     {
-        return $this->process->syncGroup();
+        return $this->process->syncGroupOnJoinFollower();
     }
 
     /**
      * @return array
-     * @throws Exception\Config
      * @throws Exception\ConnectionException
      * @throws Exception\Exception
      */

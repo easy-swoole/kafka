@@ -7,8 +7,8 @@
  */
 namespace EasySwoole\Kafka\Group;
 
-use EasySwoole\Component\Singleton;
 use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\Broker;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Consumer\Assignment;
 use EasySwoole\Kafka\Exception\ConnectionException;
@@ -16,38 +16,36 @@ use EasySwoole\Kafka\Protocol;
 
 class Process extends BaseProcess
 {
-    use Singleton;
-
     /**
      * Process constructor.
+     * @param ConsumerConfig $config
+     * @param Assignment     $assignment
+     * @param Broker         $broker
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
-    public function __construct()
+    public function __construct(ConsumerConfig $config, Assignment $assignment, Broker $broker)
     {
-        parent::__construct();
+        parent::__construct($config);
 
-        $this->config = $this->getConfig();
-        Protocol::init($this->config->getBrokerVersion());
-        $this->getBroker()->setConfig($this->config);
+        $this->setAssignment($assignment);
+        $this->setBroker($broker);
     }
 
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function getGroupBrokerId(): array
     {
         $broker  = $this->getBroker();
-
         $connect = $broker->getRandConnect();
 
         if ($connect === null) {
             throw new ConnectionException();
         }
 
-        $params = ['group_id' => ConsumerConfig::getInstance()->getGroupId()];
+        $params = ['group_id' => $this->getConfig()->getGroupId()];
 
         $requestData = Protocol::encode(Protocol::GROUP_COORDINATOR_REQUEST, $params);
         $data = $connect->send($requestData);
@@ -58,7 +56,6 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function joinGroup(): array
@@ -93,7 +90,6 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function leaveGroup(): array
@@ -119,7 +115,6 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function syncGroupOnJoinLeader(): array
@@ -151,7 +146,6 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function syncGroupOnJoinFollower(): array
@@ -181,7 +175,6 @@ class Process extends BaseProcess
     /**
      * @return array
      * @throws ConnectionException
-     * @throws \EasySwoole\Kafka\Exception\Config
      * @throws \EasySwoole\Kafka\Exception\Exception
      */
     public function describeGroups(): array
@@ -223,21 +216,5 @@ class Process extends BaseProcess
         $ret = Protocol::decode(Protocol::LIST_GROUPS_REQUEST, substr($data, 8));
 
         return $ret;
-    }
-
-    /**
-     * @return ConsumerConfig
-     */
-    protected function getConfig(): ConsumerConfig
-    {
-        return ConsumerConfig::getInstance();
-    }
-
-    /**
-     * @return Assignment
-     */
-    protected function getAssignment(): Assignment
-    {
-        return Assignment::getInstance();
     }
 }

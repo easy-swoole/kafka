@@ -1,9 +1,7 @@
 <?php
-
 namespace EasySwoole\Kafka;
 
 use EasySwoole\Kafka\Exception\Exception;
-use EasySwoole\Kafka\Protocol\Produce;
 
 class Protocol
 {
@@ -296,5 +294,4 @@ class Protocol
 
         return self::PROTOCOL_ERROR_MAP[$errCode];
     }
-
 }

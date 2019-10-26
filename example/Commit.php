@@ -20,13 +20,14 @@ go(function () {
     $config->setGroupId('test');
     $config->setTopics(['test']);
 
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
-    $ret = EasySwoole\Kafka\Group\Process::getInstance()->joinGroup();
-    $assign = Assignment::getInstance();
-    $assign->setGenerationId($ret['generationId']);
-    $assign->setMemberId($ret['memberId']);
+    $broker = new \EasySwoole\Kafka\Broker();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $offset = new Offset();
+    $assign = new Assignment();
+    $assign->setGenerationId(0);
+    $assign->setMemberId('');
+
+    $offset = new Offset($config, $assign, $broker);
 
     $result = $offset->commit([
         'test' => [

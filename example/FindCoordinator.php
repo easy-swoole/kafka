@@ -17,10 +17,11 @@ go(function () {
     $config->setBrokerVersion('0.8.2');
     $config->setGroupId('test');
 
-    EasySwoole\Kafka\SyncMeta\Process::getInstance()->syncMeta();
-    EasySwoole\Kafka\Broker::getInstance()->setGroupBrokerId('127.0.0.1:9092');
+    $syncMeta = new EasySwoole\Kafka\SyncMeta\Process($config);
+    $broker = $syncMeta->syncMeta();
+    $broker->setGroupBrokerId('127.0.0.1:9092');
 
-    $group = new Group();
+    $group = new Group($config, new \EasySwoole\Kafka\Consumer\Assignment(), $broker);
     $result = $group->findCoordinator();
     var_dump($result);
 });

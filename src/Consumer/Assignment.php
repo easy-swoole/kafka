@@ -13,8 +13,6 @@ use function count;
 
 class Assignment
 {
-    use Singleton;
-
     private $joinFuture = true;
 
     /**
@@ -76,8 +74,6 @@ class Assignment
      * @var int[][]
      */
     private $preCommitOffsets = [];
-
-
 
     /**
      * @return bool
@@ -149,12 +145,11 @@ class Assignment
     }
 
     /**
-     * @param string[] $result
+     * @param array  $result
+     * @param Broker $broker
      */
-    public function assign(array $result): void
+    public function assign(array $result, Broker $broker): void
     {
-        /** @var Broker $broker */
-        $broker = Broker::getInstance();
         $allTopics = $broker->getTopics();
         $subscribeTopics = $broker->getConfig()->getTopics();
         $memberCount = count($result);

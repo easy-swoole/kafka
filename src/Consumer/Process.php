@@ -12,7 +12,6 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
-use SebastianBergmann\CodeCoverage\Report\PHP;
 
 class Process extends BaseProcess
 {
@@ -30,28 +29,51 @@ class Process extends BaseProcess
 
     protected $brokers;
 
-    public function __construct(?callable $consumer = null)
+    /**
+     * @var Kafka\SyncMeta\Process
+     */
+    private $syncMeta;
+
+    /**
+     * @var Kafka\Group\Process
+     */
+    private $group;
+
+    /**
+     * @var Kafka\Fetch\Process
+     */
+    private $fetch;
+
+    /**
+     * @var Kafka\Offset\Process
+     */
+    private $offset;
+
+    /**
+     * @var Kafka\Heartbeat\Process
+     */
+    private $heartbeat;
+
+    public function __construct(ConsumerConfig $config)
     {
-        parent::__construct();
-
-        $this->config = $this->getConfig();
-        Protocol::init($this->config->getBrokerVersion());
-        $this->getBroker()->setConfig($this->config);
-
-        $this->consumer = $consumer;
+        parent::__construct($config);
     }
 
     /**
+     * @param callable|null $consumer
      * @throws \Throwable
      */
-    public function subscribe()
+    public function subscribe(?callable $consumer = null)
     {
+        // 注册消费回调
+        $this->consumer = $consumer;
+
         while (true) {
             try {
                 if ($this->getAssignment()->isJoinFuture()) {
                     $this->syncMeta();
 
-                    $this->getGroup();
+                    $this->getGroupNodeId();
 
                     $this->initiateJoinGroup();
                 }
@@ -62,11 +84,13 @@ class Process extends BaseProcess
 
                 $this->fetchOffset();
 
-                $this->fetchMsg();
+                $fetchMessage = $this->fetchMsg();
 
                 $this->commit();
 
-                \Co::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
+                if (empty($fetchMessage)) {
+                    \Co::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
+                }
 
             } catch (Exception\ErrorCodeException $codeException) {
                 $this->getAssignment()->setJoinFuture(true);
@@ -79,11 +103,12 @@ class Process extends BaseProcess
 
     /**
      * @throws Exception\ConnectionException
+     * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
     public function syncMeta()
     {
-        Kafka\SyncMeta\Process::getInstance()->syncMeta();
+        $this->setBroker($this->getSyncMeta()->syncMeta());
     }
 
     /**
@@ -91,9 +116,9 @@ class Process extends BaseProcess
      * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
      */
-    public function getGroup()
+    public function getGroupNodeId()
     {
-        $results = Kafka\Group\Process::getInstance()->getGroupBrokerId();
+        $results = $this->getGroup()->getGroupBrokerId();
         if (! isset($results['errorCode'], $results['nodeId'])
             || $results['errorCode'] !== Protocol::NO_ERROR
         ) {
@@ -123,15 +148,14 @@ class Process extends BaseProcess
      */
     protected function joinGroup() : bool
     {
-        $result = Kafka\Group\Process::getInstance()->joinGroup();
-
+        $result = $this->getGroup()->joinGroup();
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
             $this->stateConvert($result['errorCode']);
         }
         $this->getAssignment()->setMemberId($result['memberId']);
         $this->getAssignment()->setGenerationId($result['generationId']);
         $this->getAssignment()->setLeaderId($result['leaderId']);
-        $this->getAssignment()->assign($result['members']);
+        $this->getAssignment()->assign($result['members'], $this->getBroker());
 
         return $result['leaderId'] == $result['memberId'] ? true : false;
     }
@@ -145,9 +169,9 @@ class Process extends BaseProcess
     protected function syncGroup(bool $isLeader)
     {
         if ($isLeader) {
-            $result = Kafka\Group\Process::getInstance()->syncGroupOnJoinLeader();
+            $result = $this->getGroup()->syncGroupOnJoinLeader();
         } else {
-            $result = Kafka\Group\Process::getInstance()->syncGroupOnJoinFollower();
+            $result = $this->getGroup()->syncGroupOnJoinFollower();
         }
 
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
@@ -183,7 +207,7 @@ class Process extends BaseProcess
     public function getListOffset()
     {
         // 获取分区的offset列表
-        $results        = Kafka\Offset\Process::getInstance()->listOffset();
+        $results        = $this->getOffset()->listOffset();
         $offsets        = $this->getAssignment()->getOffsets();
         $lastOffsets    = $this->getAssignment()->getLastOffsets();
 
@@ -209,7 +233,7 @@ class Process extends BaseProcess
      */
     public function heartbeat()
     {
-        $result = Kafka\Heartbeat\Process::getInstance()->heartbeat();
+        $result = $this->getHeartbeat()->heartbeat();
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
             $this->stateConvert($result['errorCode']);
         }
@@ -222,7 +246,7 @@ class Process extends BaseProcess
      */
     public function fetchOffset()
     {
-        $result = Kafka\Offset\Process::getInstance()->fetchOffset();
+        $result = $this->getOffset()->fetchOffset();
         $offsets = $this->getAssignment()->getFetchOffsets();
         foreach ($result as $topic) {
             foreach ($topic['partitions'] as $part) {
@@ -261,10 +285,11 @@ class Process extends BaseProcess
      */
     public function fetchMsg()
     {
-        $results = Kafka\Fetch\Process::getInstance()->fetch($this->getAssignment()->getConsumerOffsets());
+        $results = $this->getFetch()->fetch($this->getAssignment()->getConsumerOffsets());
         if (!isset($results['topics'])) {
             return [];
         }
+        $fetchMessage = [];
         foreach ($results['topics'] as $k => $topic) {
             foreach ($topic['partitions'] as $part) {
                 if ($part['errorCode'] !== 0) {
@@ -281,6 +306,7 @@ class Process extends BaseProcess
 
                 foreach ($part['messages'] as $message) {
                     if (!empty($message)) {
+                        array_push($fetchMessage, $message);
                         $this->messages[$topic['topicName']][$part['partition']][] = $message;
                         $offset = $message['offset'];// 当前消息的偏移量
 //                        echo '-----------------订阅到新的消息需要处理-----topic:'.$topic['topicName'].'-------partition:'.$part['partition'].'------offset:'.$offset.'--------------'.PHP_EOL;
@@ -291,6 +317,8 @@ class Process extends BaseProcess
                 $this->getAssignment()->setConsumerOffset($topic['topicName'], $part['partition'], $consumerOffset);
             }
         }
+
+        return $fetchMessage;
     }
 
     /**
@@ -301,14 +329,14 @@ class Process extends BaseProcess
     public function commit()
     {
         // 先消费，再提交
-        if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_BEFORE_COMMIT_OFFSET) {
+        if ($this->getConfig()->getConsumeMode() === $this->getConfig()::CONSUME_BEFORE_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
 
         $commitOffset = $this->getAssignment()->getCommitOffsets();
         if (!empty($commitOffset)) {
 //            echo '--------------有消费需要提交'.PHP_EOL;
-            $results = Kafka\Offset\Process::getInstance()->commit($commitOffset);
+            $results = $this->getOffset()->commit($commitOffset);
             foreach ($results as $topic) {
                 foreach ($topic['partitions'] as $part) {
                     if ($part['errorCode'] !== Protocol::NO_ERROR) {
@@ -319,7 +347,7 @@ class Process extends BaseProcess
             $this->getAssignment()->setCommitOffsets([]);
         }
         // 先提交，再消费。默认此项
-        if ($this->getConfig()->getConsumeMode() === ConsumerConfig::CONSUME_AFTER_COMMIT_OFFSET) {
+        if ($this->getConfig()->getConsumeMode() === $this->getConfig()::CONSUME_AFTER_COMMIT_OFFSET) {
             $this->consumeMessage();
         }
     }
@@ -404,18 +432,73 @@ class Process extends BaseProcess
     }
 
     /**
-     * @return ConsumerConfig
+     * @return Kafka\SyncMeta\Process
+     * @throws Exception\Exception
      */
-    protected function getConfig(): ConsumerConfig
+    public function getSyncMeta(): Kafka\SyncMeta\Process
     {
-        return ConsumerConfig::getInstance();
+        if ($this->syncMeta === null) {
+            $this->syncMeta = new Kafka\SyncMeta\Process($this->getConfig());
+        }
+        return $this->syncMeta;
+    }
+
+    /**
+     * @return Kafka\Group\Process
+     * @throws Exception\Exception
+     */
+    public function getGroup(): Kafka\Group\Process
+    {
+        if ($this->group === null) {
+            $this->group = new Kafka\Group\Process($this->getConfig(), $this->getAssignment(), $this->getBroker());
+        }
+        return $this->group;
+    }
+
+    /**
+     * @return Kafka\Fetch\Process
+     * @throws Exception\Exception
+     */
+    public function getFetch(): Kafka\Fetch\Process
+    {
+        if ($this->fetch === null) {
+            $this->fetch = new Kafka\Fetch\Process($this->getConfig(), $this->getAssignment(), $this->getBroker());
+        }
+        return $this->fetch;
+    }
+
+    /**
+     * @return Kafka\Offset\Process
+     * @throws Exception\Exception
+     */
+    public function getOffset(): Kafka\Offset\Process
+    {
+        if ($this->offset === null) {
+            $this->offset = new Kafka\Offset\Process($this->getConfig(), $this->getAssignment(), $this->getBroker());
+        }
+        return $this->offset;
+    }
+
+    /**
+     * @return Kafka\Heartbeat\Process
+     * @throws Exception\Exception
+     */
+    public function getHeartbeat(): Kafka\Heartbeat\Process
+    {
+        if ($this->heartbeat === null) {
+            $this->heartbeat = new Kafka\Heartbeat\Process($this->getConfig(), $this->getAssignment(), $this->getBroker());
+        }
+        return $this->heartbeat;
     }
 
     /**
      * @return Assignment
      */
-    private function getAssignment(): Assignment
+    public function getAssignment(): Assignment
     {
-        return Assignment::getInstance();
+        if ($this->assignment === null) {
+            $this->assignment = new Assignment();
+        }
+        return $this->assignment;
     }
 }
