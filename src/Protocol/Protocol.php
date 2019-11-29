@@ -205,7 +205,7 @@ abstract class Protocol
         return is_array($result) ? array_shift($result) : $result;
     }
 
-    public static function pack(string $type, string $data): string
+    public static function pack(string $type, ?string $data): string
     {
         if ($type !== self::BIT_B64) {
             return pack($type, $data);

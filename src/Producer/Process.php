@@ -8,8 +8,10 @@
 namespace EasySwoole\Kafka\Producer;
 
 use EasySwoole\Kafka\BaseProcess;
+use EasySwoole\Kafka\Exception\ConnectionException;
 use EasySwoole\Kafka\Exception\Exception;
 use EasySwoole\Kafka\Config\ProducerConfig;
+use EasySwoole\Kafka\Exception\InvalidRecordInSet;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka\SyncMeta;
 
@@ -21,7 +23,7 @@ class Process extends BaseProcess
      * Process constructor.
      * @param ProducerConfig $config
      * @throws Exception
-     * @throws \EasySwoole\Kafka\Exception\ConnectionException
+     * @throws ConnectionException
      */
     public function __construct(ProducerConfig $config)
     {
@@ -38,7 +40,7 @@ class Process extends BaseProcess
      * @param array $recordSet
      * @return array
      * @throws Exception
-     * @throws \EasySwoole\Kafka\Exception\InvalidRecordInSet
+     * @throws InvalidRecordInSet
      */
     public function send(array $recordSet): array
     {
@@ -70,13 +72,18 @@ class Process extends BaseProcess
                 'compression'  => $compression,
             ];
 
-            $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
-            $data = $client->send($requestData);
-            if ($requiredAck !== 0) { // If it is 0 the server will not send any response
-                $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
-                $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 8));
-                $result[] = $ret;
+            try {
+                $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
+                $data = $client->send($requestData);
+                if ($requiredAck !== 0) { // If it is 0 the server will not send any response
+                    $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
+                    $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 8));
+                    $result[] = $ret;
+                }
+            } catch (\Exception $exception) {
+                throw new Exception('Something wrong: ' . $exception->getMessage());
             }
+
         }
         return $result;
     }
@@ -84,7 +91,7 @@ class Process extends BaseProcess
     /**
      * @param array $recordSet
      * @return array
-     * @throws \EasySwoole\Kafka\Exception\InvalidRecordInSet
+     * @throws InvalidRecordInSet
      */
     protected function convertRecordSet(array $recordSet): array
     {

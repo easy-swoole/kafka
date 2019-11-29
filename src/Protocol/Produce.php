@@ -45,11 +45,6 @@ class Produce extends Protocol
 
         $header = $this->requestHeader('Easyswoole-kafka', 0, self::PRODUCE_REQUEST);
         $data = '';
-        $version = $this->getApiVersion(self::PRODUCE_REQUEST);
-        if ($version === self::API_VERSION2) {
-            // transactional_id NULLABLE_STRING
-            $data .= self::pack(self::BIT_B32, ($payloads['transactional_id'] ?? null));
-        }
         $data .= self::pack(self::BIT_B16, (string) ($payloads['required_ack'] ?? 0));// acks int16
         $data .= self::pack(self::BIT_B32, (string) ($payloads['timeout'] ?? 100));// timeout int32
         $data .= self::encodeArray(
