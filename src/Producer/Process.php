@@ -81,7 +81,7 @@ class Process extends BaseProcess
                     $result[] = $ret;
                 }
             } catch (\Exception $exception) {
-                throw new Exception('Something Wrong:' . $exception->getMessage());
+                throw new Exception('Something wrong: ' . $exception->getMessage());
             }
 
         }

@@ -46,7 +46,7 @@ namespace App\Producer;
 
 use EasySwoole\Component\Process\AbstractProcess;
 use EasySwoole\Kafka\Config\ProducerConfig;
-use EasySwoole\Kafka\kafka;
+use EasySwoole\Kafka\Kafka;
 
 class Process extends AbstractProcess
 {
@@ -81,7 +81,7 @@ namespace App\Consumer;
 
 use EasySwoole\Component\Process\AbstractProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
-use EasySwoole\Kafka\kafka;
+use EasySwoole\Kafka\Kafka;
 
 class Process extends AbstractProcess
 {
@@ -97,7 +97,7 @@ class Process extends AbstractProcess
             $config->setTopics(['test']);
             $config->setOffsetReset('earliest');
 
-            $kafka = new kafka($config);
+            $kafka = new Kafka($config);
             // 设置消费回调
             $func = function ($topic, $partition, $message) {
                 var_dump($topic);

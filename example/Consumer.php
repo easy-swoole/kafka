@@ -9,7 +9,7 @@ require '../vendor/autoload.php';
 date_default_timezone_set('PRC');
 
 use EasySwoole\Kafka\Config\ConsumerConfig;
-use EasySwoole\Kafka\kafka;
+use EasySwoole\Kafka\Kafka;
 
 go(function () {
     $config = new ConsumerConfig();
@@ -21,7 +21,7 @@ go(function () {
     $config->setTopics(['test']);
     $config->setOffsetReset('earliest');
 
-    $kafka = new kafka($config);
+    $kafka = new Kafka($config);
     // 设置消费回调
     $func = function ($topic, $partition, $message) {
         var_dump($topic);
