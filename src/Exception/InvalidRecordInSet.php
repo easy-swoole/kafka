@@ -17,7 +17,7 @@ final class InvalidRecordInSet extends Exception
 
     public static function nonExistingTopic(string $topic): self
     {
-        return new self('Requested topic "%s" does not exist.', $topic);
+        return new self(sprintf('Requested topic "%s" does not exist.', $topic));
     }
 
     public static function topicIsNotString(): self
