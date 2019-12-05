@@ -7,6 +7,7 @@
  */
 namespace EasySwoole\Kafka\Consumer;
 
+use Swoole\Coroutine;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
@@ -89,7 +90,7 @@ class Process extends BaseProcess
                 $this->commit();
 
                 if (empty($fetchMessage)) {
-                    \Co::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
+                    Coroutine::sleep($this->getConfig()->getRefreshIntervalMs() / 1000);
                 }
 
             } catch (Exception\ErrorCodeException $codeException) {
