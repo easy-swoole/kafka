@@ -125,15 +125,20 @@ class Client
 
     /**
      * @param null|string $data
+     * @param int         $tries
      * @return mixed
      * @throws ConnectionException
      * @throws Exception
      */
-    public function send(?string $data = null)
+    public function send(?string $data = null, $tries = 2)
     {
-        if ($this->connect()) {
-            $this->client->send($data);
-            return $this->client->recv();
+        for ($try = 0; $try <= $tries; $try++) {
+            if ($this->isConnected()) {
+                $this->client->send($data);
+                return $this->client->recv();
+            }
+            $this->connect();
+            continue;
         }
         $connectStr = "tcp://{$this->host}:{$this->port}";
         throw new ConnectionException("Connect to Kafka server {$connectStr} failed: {$this->client->errMsg}");
@@ -158,5 +163,19 @@ class Client
     public function close()
     {
         $this->client->close();
+    }
+
+    /**
+     * @return bool
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function reconnect()
+    {
+        if ($this->client) {
+            $this->client->close();
+        }
+
+        return $this->connect();
     }
 }
