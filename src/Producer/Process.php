@@ -74,11 +74,14 @@ class Process extends BaseProcess
 
             try {
                 $requestData = Protocol::encode(Protocol::PRODUCE_REQUEST, $params);
-                $data = $client->send($requestData);
                 if ($requiredAck !== 0) { // If it is 0 the server will not send any response
+                    $data = $client->send($requestData);
                     $correlationId = Protocol\Protocol::unpack(Protocol\Protocol::BIT_B32, substr($data, 0, 4));
                     $ret = Protocol::decode(Protocol::PRODUCE_REQUEST, substr($data, 8));
                     $result[] = $ret;
+                } else {
+                    $ret = $client->sendWithNoResponse($requestData);
+                    $result[] = $ret ? true : false;
                 }
             } catch (\Exception $exception) {
                 throw new Exception('Something wrong: ' . $exception->getMessage());

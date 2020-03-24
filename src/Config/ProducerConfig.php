@@ -30,7 +30,7 @@ class ProducerConfig extends Config
     ];
 
     protected static $defaults = [
-        'requiredAck'       => 1,
+        'requiredAck'       => 1,// -1,阻塞等待服务端所有副本同步后发送response，0 服务端不发送response，1 服务端写入日志后发送response
         'timeout'           => 5000,
         'requestTimeout'    => 6000,//todo
         'produceInterval'   => 100,//todo

@@ -145,6 +145,26 @@ class Client
     }
 
     /**
+     * @param null|string $data
+     * @param int         $tries
+     * @return mixed
+     * @throws ConnectionException
+     * @throws Exception
+     */
+    public function sendWithNoResponse(?string $data = null, $tries = 2)
+    {
+        for ($try = 0; $try <= $tries; $try++) {
+            if ($this->isConnected()) {
+                return $this->client->send($data);
+            }
+            $this->connect();
+            continue;
+        }
+        $connectStr = "tcp://{$this->host}:{$this->port}";
+        throw new ConnectionException("Connect to Kafka server {$connectStr} failed: {$this->client->errMsg}");
+    }
+
+    /**
      * @param float $timeout
      * @return string
      * @throws ConnectionException
