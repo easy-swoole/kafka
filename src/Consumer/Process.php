@@ -13,6 +13,7 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
+use Swoole\Coroutine;
 
 class Process extends BaseProcess
 {
@@ -55,22 +56,40 @@ class Process extends BaseProcess
      */
     private $heartbeat;
 
+    private $enableListen = false;
+
     public function __construct(ConsumerConfig $config)
     {
         parent::__construct($config);
     }
 
+    public function stop()
+    {
+        $this->enableListen = false;
+        return $this;
+    }
+
     /**
      * @param callable|null $consumer
+     * @param float         $breakTime
+     * @param int           $maxCurrency
      * @throws \Throwable
      */
-    public function subscribe(?callable $consumer = null)
+    public function subscribe(?callable $consumer = null, $breakTime = 0.01, $maxCurrency = 128)
     {
         // 注册消费回调
         $this->consumer = $consumer;
 
-        while (true) {
+        $this->enableListen = true;
+        $running = 0;
+
+        while ($this->enableListen) {
+            if ($running >= $maxCurrency) {
+                Coroutine::sleep($breakTime);
+                continue;
+            }
             try {
+                ++$running;
                 if ($this->getAssignment()->isJoinFuture()) {
                     $this->syncMeta();
 
@@ -98,6 +117,8 @@ class Process extends BaseProcess
 //                echo '----------------group 成员 或者 partition数量变更 需要重新入组与分配partition'.PHP_EOL;
             } catch (\Throwable $throwable) {
                 throw  $throwable;
+            } finally {
+                --$running;
             }
         }
     }
@@ -346,10 +367,11 @@ class Process extends BaseProcess
                 }
             }
             $this->getAssignment()->setCommitOffsets([]);
-        }
-        // 先提交，再消费。默认此项
-        if ($this->getConfig()->getConsumeMode() === $this->getConfig()::CONSUME_AFTER_COMMIT_OFFSET) {
-            $this->consumeMessage();
+
+            // 先提交，再消费。默认此项
+            if ($this->getConfig()->getConsumeMode() === $this->getConfig()::CONSUME_AFTER_COMMIT_OFFSET) {
+                $this->consumeMessage();
+            }
         }
     }
 

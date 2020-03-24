@@ -29,19 +29,17 @@ class Consumer
 
     /**
      * @param callable|null $func
+     * @param float         $breakTime
+     * @param int           $maxCurrency
      * @throws \Throwable
      */
-    public function subscribe(?callable $func = null)
+    public function subscribe(?callable $func = null, $breakTime = 0.01, $maxCurrency = 128)
     {
-        $this->process->subscribe($func);
+        $this->process->subscribe($func, $breakTime, $maxCurrency);
     }
 
-    /**
-     * @throws Exception\Config
-     */
     public function stop()
     {
-        // todo
-        (new ConsumerConfig())->setConsumeStatus(false);
+        $this->process->stop();
     }
 }

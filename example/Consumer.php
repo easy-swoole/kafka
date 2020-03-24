@@ -28,5 +28,9 @@ go(function () {
         var_dump($partition);
         var_dump($message);
     };
-    $kafka->consumer()->subscribe($func);
+    $kafka->consumer()->subscribe($func, 1, 256);
+
+
+    // 停止消费
+    $kafka->consumer()->stop();
 });
