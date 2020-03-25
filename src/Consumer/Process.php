@@ -13,7 +13,7 @@ use EasySwoole\Kafka\Config\ConsumerConfig;
 use EasySwoole\Kafka\Exception;
 use EasySwoole\Kafka\Protocol;
 use EasySwoole\Kafka;
-use Swoole\Coroutine;
+
 
 class Process extends BaseProcess
 {
