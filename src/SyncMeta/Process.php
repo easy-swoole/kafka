@@ -33,10 +33,17 @@ class Process extends BaseProcess
             throw new Exception('No valid broker configured');
         }
 
+        $syncMetaFinished = false;
         shuffle($brokerHost);
         $broker = $this->getBroker();
         foreach ($brokerHost as $host) {
-            $client = $broker->getMetaConnect($host);
+            try {
+                $client = $broker->getMetaConnect($host);
+            } catch (ConnectionException $exception) {
+                // 当Kafka的一个Broker挂掉的时候，我们从其它节点同步Meta数据
+                continue;
+            }
+
             if (! $client->isConnected()) {
                 continue;
             }
@@ -59,6 +66,13 @@ class Process extends BaseProcess
                 continue;
             }
             $broker->setData($result['topics'], $result['brokers']);
+
+            // 本次同步Metadata成功了
+            $syncMetaFinished = true;
+        }
+
+        if ($syncMetaFinished == false) {
+            throw new ConnectionException('all brokers are unreachable.');
         }
 
         return $broker;

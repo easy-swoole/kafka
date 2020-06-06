@@ -211,7 +211,8 @@ class Broker
                 return $client;
             }
         } catch (\Throwable $exception) {
-            throw new Exception\Exception($exception);
+            // throw new Exception\Exception($exception);
+            throw $exception;
         }
         return null;
     }
