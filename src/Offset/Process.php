@@ -84,15 +84,23 @@ class Process extends BaseProcess
 
         if (!empty($ret)) {
             $result = [];
+            $topicSet = [];
             for ($i = 0; $i < count($ret); $i++) {
                 if ($i == 0) {
                     $result = $ret[$i];
+                    foreach ($result as $k => $topic) {
+                        $topicSet[] = $topic['topicName'];
+                    }
                     continue;
                 }
                 foreach ($result as $k => $topic) {
                     foreach ($ret[$i] as $queryTopic) {
                         if ($topic['topicName'] == $queryTopic['topicName']) {
                             $result[$k]['partitions'] = array_merge($result[$k]['partitions'], $queryTopic['partitions']);
+                            break;
+                        } else if (! in_array($queryTopic['topicName'], $topicSet)) {
+                            $result[] = $queryTopic;
+                            $topicSet[] = $queryTopic['topicName'];
                             break;
                         }
                     }
