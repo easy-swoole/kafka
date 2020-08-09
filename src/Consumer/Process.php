@@ -448,7 +448,6 @@ class Process extends BaseProcess
 
                 $wait = new \EasySwoole\Component\WaitGroup();
 
-                $start = time();
                 $count = count($data);
                 foreach ($data as $index => $item)
                 {
