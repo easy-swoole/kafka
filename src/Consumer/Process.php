@@ -431,11 +431,45 @@ class Process extends BaseProcess
      */
     private function consumeMessage(): void
     {
-        foreach ($this->messages as $topic => $value) {
-            foreach ($value as $partition => $messages) {
-                foreach ($messages as $message) {
-                    if ($this->consumer !== null) {
+        $concurrentNumber = $this->getConfig()->getConcurrentNumber();
+
+        if ($this->consumer !== null)
+        {
+            if ($concurrentNumber > 1)
+            {
+                $data = [];
+                foreach ($this->messages as $topic => $value) {
+                    foreach ($value as $partition => $messages) {
+                        foreach ($messages as $message) {
+                            $data[] = [$topic, $partition, $message];
+                        }
+                    }
+                }
+
+                $wait = new \EasySwoole\Component\WaitGroup();
+
+                $count = count($data);
+                foreach ($data as $index => $item)
+                {
+                    $wait->add();
+
+                    go(function () use ($topic, $partition, $message, &$wait){
                         ($this->consumer)($topic, $partition, $message);
+                        $wait->done();
+                    });
+
+                    if ((($index+1) % $concurrentNumber) === 0 || $count === ($index+1))
+                    {
+                        $wait->wait();
+                    }
+                }
+
+            } else {
+                foreach ($this->messages as $topic => $value) {
+                    foreach ($value as $partition => $messages) {
+                        foreach ($messages as $message) {
+                            ($this->consumer)($topic, $partition, $message);
+                        }
                     }
                 }
             }

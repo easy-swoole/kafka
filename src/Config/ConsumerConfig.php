@@ -34,6 +34,7 @@ class ConsumerConfig extends Config
      */
     protected $runtimeOptions = [
         'consume_mode' => self::CONSUME_AFTER_COMMIT_OFFSET,
+        'concurrentNumber' => 1
     ];
 
     /**
@@ -236,5 +237,21 @@ class ConsumerConfig extends Config
         }
 
         static::$options['consumeStatus'] = $consumeStatus;
+    }
+
+    /**
+     * 设置数据的并发消费数
+     *
+     * @param int $concurrentNumber
+     * CreateTime: 2020/8/10 12:21 上午
+     * @throws Exception\Config
+     */
+    public function setConcurrentNumber(int $concurrentNumber=1)
+    {
+        if ($concurrentNumber < 1)
+        {
+            throw new Exception\Config('Set consumer $concurrentNumber value is invalid, must lt 0');
+        }
+        static::$options['concurrentNumber'] = $concurrentNumber;
     }
 }
