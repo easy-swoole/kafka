@@ -433,40 +433,27 @@ class Process extends BaseProcess
         $concurrentNumber = $this->getConfig()->getConcurrentNumber();
 
         if ($this->consumer !== null) {
-            if ($concurrentNumber > 1) {
-                $data = [];
-                foreach ($this->messages as $topic => $value) {
-                    foreach ($value as $partition => $messages) {
-                        foreach ($messages as $message) {
-                            $data[] = [$topic, $partition, $message];
-                        }
-                    }
-                }
-
-                $wait = new WaitGroup();
-                $count = count($data);
-                foreach ($data as $index => $item) {
-                    $wait->add();
-                    Coroutine::create(function () use ($topic, $partition, $message, &$wait) {
-                        ($this->consumer)($topic, $partition, $message);
-                        $wait->done();
-                    });
-
-                    if ((($index + 1) % $concurrentNumber) === 0 || $count === ($index + 1)) {
-                        $wait->wait();
-                    }
-                }
-
-            } else {
-                foreach ($this->messages as $topic => $value) {
-                    foreach ($value as $partition => $messages) {
-                        foreach ($messages as $message) {
-                            ($this->consumer)($topic, $partition, $message);
+            $wait = new WaitGroup();
+            foreach ($this->messages as $topic => $value) {
+                foreach ($value as $partition => $messages) {
+                    foreach ($messages as $message) {
+                        if($concurrentNumber > 1){
+                            $wait->add();
+                            Coroutine::create(function ()use($topic, $partition, $message,$wait){
+                                call_user_func($this->consumer,$topic, $partition, $message);
+                                $wait->done();
+                            });
+                        }else{
+                            call_user_func($this->consumer,$topic, $partition, $message);
                         }
                     }
                 }
             }
+            //可以始终进行wait
+            $wait->wait();
         }
+
+        //这边强制清空消息是因为默认是先提交，后消费。如果出现部分消费失败，且为先消费后提交模式，又怎么办呢？？？？
 
         $this->messages = [];
     }
