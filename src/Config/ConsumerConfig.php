@@ -33,7 +33,7 @@ class ConsumerConfig extends Config
      * @var mixed[]
      */
     protected $runtimeOptions = [
-        'consume_mode' => self::CONSUME_AFTER_COMMIT_OFFSET,
+        'consumeMode' => self::CONSUME_AFTER_COMMIT_OFFSET,
         'concurrentNumber' => 1
     ];
 
@@ -163,7 +163,7 @@ class ConsumerConfig extends Config
             );
         }
 
-        $this->runtimeOptions['consume_mode'] = $mode;
+        $this->runtimeOptions['consumeMode'] = $mode;
     }
 
     /**
@@ -171,7 +171,7 @@ class ConsumerConfig extends Config
      */
     public function getConsumeMode(): int
     {
-        return $this->runtimeOptions['consume_mode'];
+        return $this->runtimeOptions['consumeMode'];
     }
 
     /**
