@@ -5,8 +5,10 @@
  * Date: 2019/9/18
  * Time: 上午10:31
  */
+
 namespace EasySwoole\Kafka\Consumer;
 
+use EasySwoole\Component\WaitGroup;
 use Swoole\Coroutine;
 use EasySwoole\Kafka\BaseProcess;
 use EasySwoole\Kafka\Config\ConsumerConfig;
@@ -71,8 +73,8 @@ class Process extends BaseProcess
 
     /**
      * @param callable|null $consumer
-     * @param float         $breakTime
-     * @param int           $maxCurrency
+     * @param float $breakTime
+     * @param int $maxCurrency
      * @throws \Throwable
      */
     public function subscribe(?callable $consumer = null, $breakTime = 0.01, $maxCurrency = 128)
@@ -141,7 +143,7 @@ class Process extends BaseProcess
     public function getGroupNodeId()
     {
         $results = $this->getGroup()->getGroupBrokerId();
-        if (! isset($results['errorCode'], $results['nodeId'])
+        if (!isset($results['errorCode'], $results['nodeId'])
             || $results['errorCode'] !== Protocol::NO_ERROR
         ) {
             $this->stateConvert($results['errorCode']);
@@ -163,12 +165,12 @@ class Process extends BaseProcess
     }
 
     /**
-     * @throws Exception\ConnectionException
+     * @return bool
      * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
-     * @return bool
+     * @throws Exception\ConnectionException
      */
-    protected function joinGroup() : bool
+    protected function joinGroup(): bool
     {
         $result = $this->getGroup()->joinGroup();
         if (isset($result['errorCode']) && $result['errorCode'] !== Protocol::NO_ERROR) {
@@ -183,7 +185,7 @@ class Process extends BaseProcess
     }
 
     /**
-     * @param  bool $isLeader
+     * @param bool $isLeader
      * @throws Exception\ConnectionException
      * @throws Exception\ErrorCodeException
      * @throws Exception\Exception
@@ -229,9 +231,9 @@ class Process extends BaseProcess
     public function getListOffset()
     {
         // 获取分区的offset列表
-        $results        = $this->getOffset()->listOffset();
-        $offsets        = $this->getAssignment()->getOffsets();
-        $lastOffsets    = $this->getAssignment()->getLastOffsets();
+        $results = $this->getOffset()->listOffset();
+        $offsets = $this->getAssignment()->getOffsets();
+        $lastOffsets = $this->getAssignment()->getLastOffsets();
 
         foreach ($results as $topic) {
             foreach ($topic['partitions'] as $part) {
@@ -240,8 +242,8 @@ class Process extends BaseProcess
                     continue;
                 }
 
-                $offsets[$topic['topicName']][$part['partition']]       = end($part['offsets']);
-                $lastOffsets[$topic['topicName']][$part['partition']]   = $part['offsets'][0];
+                $offsets[$topic['topicName']][$part['partition']] = end($part['offsets']);
+                $lastOffsets[$topic['topicName']][$part['partition']] = $part['offsets'][0];
             }
         }
         $this->getAssignment()->setOffsets($offsets);
@@ -282,8 +284,8 @@ class Process extends BaseProcess
         }
         $this->getAssignment()->setFetchOffsets($offsets);
 
-        $consumerOffsets    = $this->getAssignment()->getConsumerOffsets();
-        $lastOffsets        = $this->getAssignment()->getLastOffsets();
+        $consumerOffsets = $this->getAssignment()->getConsumerOffsets();
+        $lastOffsets = $this->getAssignment()->getLastOffsets();
 
         if (empty($consumerOffsets)) {
             $consumerOffsets = $this->getAssignment()->getFetchOffsets();
@@ -331,7 +333,6 @@ class Process extends BaseProcess
                         array_push($fetchMessage, $message);
                         $this->messages[$topic['topicName']][$part['partition']][] = $message;
                         $offset = $message['offset'];// 当前消息的偏移量
-//                        echo '-----------------订阅到新的消息需要处理-----topic:'.$topic['topicName'].'-------partition:'.$part['partition'].'------offset:'.$offset.'--------------'.PHP_EOL;
                         $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
                     }
                 }
@@ -357,7 +358,6 @@ class Process extends BaseProcess
 
         $commitOffset = $this->getAssignment()->getCommitOffsets();
         if (!empty($commitOffset)) {
-//            echo '--------------有消费需要提交'.PHP_EOL;
             $results = $this->getOffset()->commit($commitOffset);
             foreach ($results as $topic) {
                 foreach ($topic['partitions'] as $part) {
@@ -376,7 +376,7 @@ class Process extends BaseProcess
     }
 
     /**
-     * @param int        $errorCode
+     * @param int $errorCode
      * @param array|null $context
      * @throws Exception\ErrorCodeException
      */
@@ -412,17 +412,16 @@ class Process extends BaseProcess
             $this->getAssignment()->clearOffset();
         }
         if ($errorCode === Protocol::OFFSET_OUT_OF_RANGE) {
-            $resetOffset      = $this->getConfig()->getOffsetReset();
-            $offsets          = $resetOffset === 'latest' ?
+            $resetOffset = $this->getConfig()->getOffsetReset();
+            $offsets = $resetOffset === 'latest' ?
                 $this->getAssignment()->getLastOffsets() : $this->getAssignment()->getOffsets();
 
             [$topic, $partId] = $context;
 
             if (isset($offsets[$topic][$partId])) {
-                $this->getAssignment()->setConsumerOffset($topic, (int) $partId, $offsets[$topic][$partId]);
+                $this->getAssignment()->setConsumerOffset($topic, (int)$partId, $offsets[$topic][$partId]);
             }
         }
-//        echo '--------------'.$errorCode.'--------'.Protocol::getError($errorCode).PHP_EOL;
         throw new Exception\ErrorCodeException(Protocol::getError($errorCode));
     }
 
@@ -433,10 +432,8 @@ class Process extends BaseProcess
     {
         $concurrentNumber = $this->getConfig()->getConcurrentNumber();
 
-        if ($this->consumer !== null)
-        {
-            if ($concurrentNumber > 1)
-            {
+        if ($this->consumer !== null) {
+            if ($concurrentNumber > 1) {
                 $data = [];
                 foreach ($this->messages as $topic => $value) {
                     foreach ($value as $partition => $messages) {
@@ -446,20 +443,16 @@ class Process extends BaseProcess
                     }
                 }
 
-                $wait = new \EasySwoole\Component\WaitGroup();
-
+                $wait = new WaitGroup();
                 $count = count($data);
-                foreach ($data as $index => $item)
-                {
+                foreach ($data as $index => $item) {
                     $wait->add();
-
-                    go(function () use ($topic, $partition, $message, &$wait){
+                    Coroutine::create(function () use ($topic, $partition, $message, &$wait) {
                         ($this->consumer)($topic, $partition, $message);
                         $wait->done();
                     });
 
-                    if ((($index+1) % $concurrentNumber) === 0 || $count === ($index+1))
-                    {
+                    if ((($index + 1) % $concurrentNumber) === 0 || $count === ($index + 1)) {
                         $wait->wait();
                     }
                 }
@@ -480,7 +473,7 @@ class Process extends BaseProcess
 
     /**
      * @param \Throwable $throwable
-     * @param mixed      ...$args
+     * @param mixed ...$args
      * @throws \Throwable
      */
     protected function onException(\Throwable $throwable, ...$args)
