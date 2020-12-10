@@ -332,7 +332,8 @@ class Process extends BaseProcess
                     if (!empty($message)) {
                         array_push($fetchMessage, $message);
                         $this->messages[$topic['topicName']][$part['partition']][] = $message;
-                        $offset = $message['offset'];// 当前消息的偏移量
+                        // 当前消息的偏移量
+                        $offset = ($part['highwaterMarkOffset'] > $message['offset']) ? ($message['offset'] + 1) : $message['offset'];
                         $this->getAssignment()->setCommitOffset($topic['topicName'], $part['partition'], $offset);
                     }
                 }
