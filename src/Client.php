@@ -79,7 +79,7 @@ class Client
             'package_length_type'   => 'N',
             'package_length_offset' => 0,
             'package_body_offset'   => 4,
-            'package_max_length'    => 1024 * 1024 * 3,
+            'package_max_length'    => 1024 * 1024 * 10,
         ];
 
         if (!$this->client instanceof Client) {
