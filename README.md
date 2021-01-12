@@ -111,12 +111,21 @@ class Process extends AbstractProcess
 
 ```
 
-### 附赠
-1. Kafka 集群部署 docker-compose.yml 一份，使用方式如下
-    1. 保证2181,9092,9093,9000端口未被占用（占用后可以修改compose文件中的端口号）
-    2. 根目录下，docker-compose up -d
-    3. 访问localhost:9000，可以查看kafka集群状态。
-    
+### docker-compose.yml
+```
+启动
+    docker-compose -f docker-compose.yml up -d
+生成更多节点
+    docker-compose scale kafka=3
+创建topic
+    docker exec kafka_kafka_1 kafka-topics.sh  --create --topic test --partitions 3 --zookeeper zookeeper:2181 --replication-factor 3
+查看topic
+    docker exec kafka_kafka_1 kafka-topics.sh --list --zookeeper zookeeper:2181
+生产
+    docker exec -it kafka_kafka_1 kafka-console-producer.sh --topic test --broker-list kafka_kafka_1:9092,kafka_kafka_2:9092,kafka_kafka_2:9092
+消费
+    docker exec -it kafka_kafka_1 kafka-console-consumer.sh --topic test --bootstrap-server kafka_kafka_1:9092,kafka_kafka_2:9092,kafka_kafka_2:9092
+```
 ### Any Question
 kafka使用问题及bug，欢迎到Easyswoole的kaka群中提问或反馈
 QQ群号：827432930
