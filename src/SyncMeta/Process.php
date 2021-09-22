@@ -65,6 +65,14 @@ class Process extends BaseProcess
             if (empty($result['brokers'])) {
                 continue;
             }
+
+            // 修复在docker环境下使用getGroupBrokerId时出现 DNS Lookup resolve failed 的异常
+            $hostArr = explode(':', $host);
+            foreach ($result['brokers'] as $k => $v) {
+                $result['brokers'][$k]['host'] = $hostArr[0];
+                $result['brokers'][$k]['port'] = $hostArr[1];
+            }
+
             $broker->setData($result['topics'], $result['brokers']);
 
             // 本次同步Metadata成功了
