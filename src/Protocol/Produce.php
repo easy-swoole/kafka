@@ -168,7 +168,7 @@ class Produce extends Protocol
         $data .= self::pack(self::BIT_B8, (string) $attributes);
 
         if ($magic >= self::MESSAGE_MAGIC_VERSION1) {
-            $data .= self::pack(self::BIT_B64, time());
+            $data .= self::pack(self::BIT_B64, (int) (microtime(true) * 1000));
         }
 
         $key = '';
