@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\GroupCoordinator;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -39,6 +40,8 @@ final class GroupCoordinatorTest extends TestCase
      */
     public function testEncodeNoGroupId(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given group coordinator invalid. `group_id` is undefined.');
         $this->group->encode();
     }
 

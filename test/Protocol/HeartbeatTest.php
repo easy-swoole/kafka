@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\Heartbeat;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -45,6 +46,8 @@ final class HeartbeatTest extends TestCase
      */
     public function testEncodeNoGroupId(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given heartbeat data invalid. `group_id` is undefined.');
         $this->heart->encode();
     }
 
@@ -56,6 +59,8 @@ final class HeartbeatTest extends TestCase
     {
         $data = ['group_id' => 'test'];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given heartbeat data invalid. `generation_id` is undefined.');
         $this->heart->encode($data);
     }
 
@@ -70,6 +75,8 @@ final class HeartbeatTest extends TestCase
             'generation_id' => '1',
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given heartbeat data invalid. `member_id` is undefined.');
         $this->heart->encode($data);
     }
 

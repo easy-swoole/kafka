@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\Produce;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -145,6 +146,8 @@ final class ProduceTest extends TestCase
      */
     public function testEncodeNoData(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage("given produce data invalid, 'data' is undefined.");
         $this->produce->encode();
     }
 
@@ -160,6 +163,8 @@ final class ProduceTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given produce data invalid. `topic_name` is undefined.');
         $this->produce->encode($data);
     }
 
@@ -175,6 +180,8 @@ final class ProduceTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given produce data invalid. `partitions` is undefined.');
         $this->produce->encode($data);
     }
 
@@ -195,6 +202,8 @@ final class ProduceTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given produce data invalid. `partition_id` is undefined.');
         $this->produce->encode($data);
     }
 
@@ -217,6 +226,8 @@ final class ProduceTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given produce data invalid. `messages` is undefined.');
         $this->produce->encode($data);
     }
 

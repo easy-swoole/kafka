@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\FetchOffset;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -49,6 +50,8 @@ final class FetchOffsetTest extends TestCase
      */
     public function testEncodeNoData(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch offset data invalid. `data` is undefined.');
         $this->offset->encode();
     }
 
@@ -62,6 +65,8 @@ final class FetchOffsetTest extends TestCase
             'data' => [],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch offset data invalid. `group_id` is undefined.');
         $this->offset->encode($data);
     }
 
@@ -78,6 +83,8 @@ final class FetchOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch offset data invalid. `topic_name` is undefined.');
         $this->offset->encode($data);
     }
 
@@ -94,6 +101,8 @@ final class FetchOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch offset data invalid. `partitions` is undefined.');
         $this->offset->encode($data);
     }
 

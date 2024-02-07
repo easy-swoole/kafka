@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\Offset;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -52,6 +53,8 @@ final class OffsetTest extends TestCase
      */
     public function testEncodeNoData(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given offset data invalid. `data` is undefined.');
         $this->offset->encode();
     }
 
@@ -67,6 +70,8 @@ final class OffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given offset data invalid. `topic_name` is undefined.');
         $this->offset->encode($data);
     }
 
@@ -82,6 +87,8 @@ final class OffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given offset data invalid. `partitions` is undefined.');
         $this->offset->encode($data);
     }
 
@@ -102,6 +109,8 @@ final class OffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given offset data invalid. `partition_id` is undefined.');
         $this->offset->encode($data);
     }
 
