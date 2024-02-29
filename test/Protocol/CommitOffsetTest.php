@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\CommitOffset;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -87,6 +88,8 @@ final class CommitOffsetTest extends TestCase
     {
         $data = ['group_id' => 'test'];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit data invalid. `data` is undefined.');
         $this->commit->encode($data);
     }
 
@@ -100,6 +103,8 @@ final class CommitOffsetTest extends TestCase
             'data' => [],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit offset data invalid. `group_id` is undefined.');
         $this->commit->encode($data);
     }
 
@@ -116,6 +121,8 @@ final class CommitOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit offset data invalid. `topic_name` is undefined.');
         $this->commit->encode($data);
     }
 
@@ -132,6 +139,8 @@ final class CommitOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit offset data invalid. `partitions` is undefined.');
         $this->commit->encode($data);
     }
 
@@ -153,6 +162,8 @@ final class CommitOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit offset data invalid. `partition` is undefined.');
         $this->commit->encode($data);
     }
 
@@ -174,6 +185,8 @@ final class CommitOffsetTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given commit offset data invalid. `offset` is undefined.');
         $this->commit->encode($data);
     }
 

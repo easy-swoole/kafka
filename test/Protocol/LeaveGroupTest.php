@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\LeaveGroup;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -44,6 +45,8 @@ final class LeaveGroupTest extends TestCase
      */
     public function testEncodeNoGroupId(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given leave group data invalid. `group_id` is undefined.');
         $this->leave->encode();
     }
 
@@ -55,6 +58,8 @@ final class LeaveGroupTest extends TestCase
     {
         $data = ['group_id' => 'test'];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given leave group data invalid. `member_id` is undefined.');
         $this->leave->encode($data);
     }
 

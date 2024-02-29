@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\Fetch;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -57,6 +58,8 @@ final class FetchTest extends TestCase
      */
     public function testEncodeNoData(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch kafka data invalid. `data` is undefined.');
         $this->fetch->encode();
     }
 
@@ -98,6 +101,8 @@ final class FetchTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch data invalid. `topic_name` is undefined.');
         $this->fetch->encode($data);
     }
 
@@ -113,6 +118,8 @@ final class FetchTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch data invalid. `partitions` is undefined.');
         $this->fetch->encode($data);
     }
 
@@ -133,6 +140,8 @@ final class FetchTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given fetch data invalid. `partition_id` is undefined.');
         $this->fetch->encode($data);
     }
 

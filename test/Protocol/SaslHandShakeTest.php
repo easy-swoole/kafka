@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\SaslHandShake;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -38,6 +39,8 @@ final class SaslHandShakeTest extends TestCase
      */
     public function testEncodeNoMechanismGiven(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('Invalid request SASL hand shake mechanism given.');
         $this->sasl->encode();
     }
 
@@ -47,6 +50,8 @@ final class SaslHandShakeTest extends TestCase
      */
     public function testEncodeInvalidMechanism(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('Invalid request SASL hand shake mechanism given, it must be one of: GSSAPI|PLAIN|SCRAM-SHA-256|SCRAM-SHA-512');
         $this->sasl->encode(['NOTALLOW']);
     }
 

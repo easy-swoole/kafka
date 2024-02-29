@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\SyncGroup;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -44,6 +45,8 @@ final class SyncGroupTest extends TestCase
      */
     public function testEncodeNoGroupId(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given sync group data invalid. `group_id` is undefined.');
         $this->sync->encode();
     }
 
@@ -55,6 +58,8 @@ final class SyncGroupTest extends TestCase
     {
         $data = ['group_id' => 'test'];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given sync group data invalid. `generation_id` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -69,6 +74,8 @@ final class SyncGroupTest extends TestCase
             'generation_id' => '1',
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given sync group data invalid. `member_id` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -84,6 +91,8 @@ final class SyncGroupTest extends TestCase
             'member_id' => 'Easyswoole-kafka-bd5d5bb2-2a1f-43d4-b831-b1510d81ac5c',
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given sync group data invalid. `data` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -102,6 +111,8 @@ final class SyncGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `version` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -120,6 +131,8 @@ final class SyncGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `member_id` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -141,6 +154,8 @@ final class SyncGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `assignments` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -165,6 +180,8 @@ final class SyncGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `topic_name` is undefined.');
         $this->sync->encode($data);
     }
 
@@ -189,6 +206,8 @@ final class SyncGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `partitions` is undefined.');
         $this->sync->encode($data);
     }
 

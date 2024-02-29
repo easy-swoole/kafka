@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace EasySwoole\test\Protocol;
 
+use EasySwoole\Kafka\Exception\Protocol as ProtocolException;
 use EasySwoole\Kafka\Protocol\JoinGroup;
 use PHPUnit\Framework\TestCase;
 use function bin2hex;
@@ -52,6 +53,8 @@ final class JoinGroupTest extends TestCase
      */
     public function testEncodeNoGroupId(): void
     {
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given join group data invalid. `group_id` is undefined.');
         $this->group->encode();
     }
 
@@ -63,6 +66,8 @@ final class JoinGroupTest extends TestCase
     {
         $data = ['group_id' => 'test'];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given join group data invalid. `session_timeout` is undefined.');
         $this->group->encode($data);
     }
 
@@ -77,6 +82,8 @@ final class JoinGroupTest extends TestCase
             'session_timeout' => 6000,
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given join group data invalid. `member_id` is undefined.');
         $test = $this->group->encode($data);
     }
 
@@ -92,6 +99,8 @@ final class JoinGroupTest extends TestCase
             'member_id'       => '',
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given join group data invalid. `data` is undefined.');
         $this->group->encode($data);
     }
 
@@ -139,6 +148,8 @@ final class JoinGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given join group data invalid. `protocol_name` is undefined.');
         $this->group->encode($data);
     }
 
@@ -158,6 +169,8 @@ final class JoinGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `version` is undefined.');
         $test = $this->group->encode($data);
     }
 
@@ -180,6 +193,8 @@ final class JoinGroupTest extends TestCase
             ],
         ];
 
+        $this->expectException(ProtocolException::class);
+        $this->expectExceptionMessage('given data invalid. `subscription` is undefined.');
         $this->group->encode($data);
     }
 
